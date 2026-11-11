@@ -43,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -63,7 +64,10 @@ import com.pranshulgg.recordmaster.ui.components.EmptyContainerPlaceholder
 import com.pranshulgg.recordmaster.ui.components.RecordingRow
 import com.pranshulgg.recordmaster.ui.components.Symbol
 import com.pranshulgg.recordmaster.ui.components.TopBarWithSearch
-import com.pranshulgg.recordmaster.utils.computeDirKey
+import com.pranshulgg.recordmaster.helpers.StorageHelper
+import com.pranshulgg.recordmaster.utils.RecordingGroup
+import com.pranshulgg.recordmaster.utils.groupByMonth
+import com.pranshulgg.recordmaster.utils.listRecordingFiles
 import com.pranshulgg.recordmaster.utils.moveFileToDir
 import com.pranshulgg.recordmaster.utils.stopIfPlayingAndCleanup
 import kotlinx.coroutines.Dispatchers
@@ -71,9 +75,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -118,11 +119,9 @@ fun HomeScreen(navController: NavController, snackbarHostState: SnackbarHostStat
         }
     }
 
-    val musicDir = remember {
-        context.getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: context.filesDir
-    }
+    val musicDir = remember { StorageHelper.getRecordingsDir(context) }
 
-    val garbageDir = remember {
+    val garbageDir = remember(musicDir) {
         File(musicDir, "garbage").apply { if (!exists()) mkdirs() }
     }
 
@@ -134,7 +133,7 @@ fun HomeScreen(navController: NavController, snackbarHostState: SnackbarHostStat
         selectedPaths = if (selectedPaths.contains(path)) selectedPaths - path else selectedPaths + path
     }
     var showGarbageConfirmDeleteSelectedDialog by remember { mutableStateOf(false) }
-    var showGarbageConfirmDeleteDialog by remember { mutableStateOf(false) }
+    var garbageDeleteTarget by remember { mutableStateOf<File?>(null) }
 
 
     fun shareSelected() {
@@ -194,10 +193,10 @@ fun HomeScreen(navController: NavController, snackbarHostState: SnackbarHostStat
             scope.launch { showMessage("Moved to garbage") }
         }
 
-        rootDirKey = computeDirKey(musicDir)
-        garbageDirKey = computeDirKey(garbageDir)
+        rootDirKey++
+        garbageDirKey++
         if (currentTab == "folder" && selectedFolderName != null) {
-            selectedFolderKey = computeDirKey(File(musicDir, selectedFolderName!!))
+            selectedFolderKey++
         }
 
         selectedPaths = emptySet()
@@ -214,24 +213,11 @@ fun HomeScreen(navController: NavController, snackbarHostState: SnackbarHostStat
                     try { file.delete() } catch (_: Throwable) {}
                 }
                 filesToDelete = emptyList()
+                garbageDirKey++
                 showGarbageConfirmDeleteSelectedDialog = false
             },
             onDismiss = { showGarbageConfirmDeleteSelectedDialog = false }
         )
-    }
-
-    LaunchedEffect(musicDir.absolutePath) {
-        rootDirKey = computeDirKey(musicDir)
-        garbageDirKey = computeDirKey(garbageDir)
-    }
-
-    LaunchedEffect(selectedFolderName, musicDir.absolutePath) {
-        if (!selectedFolderName.isNullOrEmpty()) {
-            val folder = File(musicDir, selectedFolderName!!)
-            selectedFolderKey = computeDirKey(folder)
-        } else {
-            selectedFolderKey = 0L
-        }
     }
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
@@ -338,32 +324,6 @@ fun HomeScreen(navController: NavController, snackbarHostState: SnackbarHostStat
             ) {
 
 
-                val rootFiles by remember(rootDirKey) {
-                    mutableStateOf(
-                        (musicDir.listFiles() ?: emptyArray())
-                            .filter { it.isFile }
-                            .sortedByDescending { it.lastModified() }
-                    )
-                }
-
-                val garbageFiles by remember(garbageDirKey) {
-                    mutableStateOf(
-                        (garbageDir.listFiles() ?: emptyArray())
-                            .filter { it.isFile }
-                            .sortedByDescending { it.lastModified() }
-                    )
-                }
-
-                val folderFiles by remember(selectedFolderKey, selectedFolderName) {
-                    mutableStateOf(
-                        if (!selectedFolderName.isNullOrEmpty()) {
-                            val f = File(musicDir, selectedFolderName!!)
-                            (f.listFiles() ?: emptyArray()).filter { it.isFile }.sortedByDescending { it.lastModified() }
-                        } else emptyList()
-                    )
-                }
-
-
 
                 var isPlaying by remember { mutableStateOf(false) }
                 var currentPos by remember { mutableStateOf(0) }
@@ -376,45 +336,51 @@ fun HomeScreen(navController: NavController, snackbarHostState: SnackbarHostStat
                     }
                 }
 
-                val displayedRecordings = if (searchQuery.isBlank()) {
-                    when (currentTab) {
-                        "home" -> rootFiles
-                        "garbage" -> garbageFiles
-                        "folder" -> folderFiles
-                        else -> rootFiles
+                // Everything below runs off the main thread: listing, sorting, searching and
+                // month-grouping happen once per change instead of on every recomposition.
+                val query = searchQuery
+                val tab = currentTab
+                val folderName = selectedFolderName
+                val groupsState = produceState<List<RecordingGroup>?>(
+                    null,
+                    tab, folderName, query, rootDirKey, garbageDirKey, selectedFolderKey
+                ) {
+                    if (query.isNotBlank()) delay(150) // debounce typing
+                    value = withContext(Dispatchers.IO) {
+                        val items = if (query.isBlank()) {
+                            when (tab) {
+                                "garbage" -> listRecordingFiles(garbageDir)
+                                "folder" ->
+                                    if (!folderName.isNullOrEmpty()) listRecordingFiles(File(musicDir, folderName))
+                                    else emptyList()
+                                else -> listRecordingFiles(musicDir)
+                            }
+                        } else {
+                            val subfolderFiles = (musicDir.listFiles() ?: emptyArray())
+                                .filter { it.isDirectory && it.name != "garbage" }
+                                .flatMap { listRecordingFiles(it) }
+                            (listRecordingFiles(musicDir) + listRecordingFiles(garbageDir) + subfolderFiles)
+                                .filter { it.first.name.contains(query, ignoreCase = true) }
+                                .sortedByDescending { it.second }
+                        }
+                        groupByMonth(items)
                     }
-                } else {
-                    val allCandidates = mutableListOf<File>()
-                    allCandidates += rootFiles
-                    allCandidates += garbageFiles
-                    val allSubfolderFiles = (musicDir.listFiles() ?: emptyArray())
-                        .filter { it.isDirectory && it.name != "garbage" }
-                        .flatMap { (it.listFiles() ?: emptyArray()).filter { f -> f.isFile } }
-                    allCandidates += allSubfolderFiles
-                    allCandidates.filter { it.name.contains(searchQuery, ignoreCase = true) }
-                        .sortedByDescending { it.lastModified() }
                 }
+                val groups = groupsState.value
 
-
-
-
-                if (displayedRecordings.isEmpty()) {
+                if (groups == null) {
+                    // first load still in progress
+                } else if (groups.isEmpty()) {
                     EmptyContainerPlaceholder(R.drawable.graphic_eq_24px, "No recordings")
                 } else {
-                    val sdfMonth = SimpleDateFormat("MMMM", Locale.getDefault())
-                    val grouped = displayedRecordings
-                        .groupBy { sdfMonth.format(Date(it.lastModified())) }
-                        .entries
-                        .sortedByDescending { entry -> entry.value.maxOf { it.lastModified() } }
-
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                     ) {
-                        grouped.forEach { (month, files) ->
-                            item {
+                        groups.forEach { group ->
+                            item(key = "month_${group.month}") {
                                     Text(
-                                        text = month,
+                                        text = group.month,
                                         color = MaterialTheme.colorScheme.primary,
                                         fontWeight = FontWeight.W700,
                                         fontSize = 16.sp
@@ -423,13 +389,16 @@ fun HomeScreen(navController: NavController, snackbarHostState: SnackbarHostStat
                                     Spacer(modifier = Modifier.height(6.dp))
                             }
 
-                            items(files) { file ->
+                            items(group.files, key = { it.absolutePath }) { file ->
+                                // Only the row that is playing gets the live position, so the other
+                                // rows aren't recomposed 5 times a second during playback.
+                                val isThisFile = playingPath == file.absolutePath
                                 RecordingRow(
                                     file = file,
-                                    isThisPlaying = playingPath == file.absolutePath && isPlaying,
-                                    progress = if (playingPath == file.absolutePath && duration > 0) (currentPos.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f,
-                                    currentPositionMillis = currentPos,
-                                    currentDurationMillis = duration,
+                                    isThisPlaying = isThisFile && isPlaying,
+                                    progress = if (isThisFile && duration > 0) (currentPos.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f,
+                                    currentPositionMillis = if (isThisFile) currentPos else 0,
+                                    currentDurationMillis = if (isThisFile) duration else 0,
                                     onItemClick = {
                                         if (selectedPaths.isNotEmpty()) {
                                             toggleSelection(file.absolutePath)
@@ -479,16 +448,16 @@ fun HomeScreen(navController: NavController, snackbarHostState: SnackbarHostStat
                                     onDelete = {
                                         if (currentTab == "garbage") {
 
-                                            showGarbageConfirmDeleteDialog = true
+                                            garbageDeleteTarget = file
 
                                         } else {
                                             val fromParent = file.parentFile
                                             moveFileToDir(file, garbageDir)
                                             if (playingPath == file.absolutePath) playingPath = null
-                                            rootDirKey = computeDirKey(musicDir)
-                                            garbageDirKey = computeDirKey(garbageDir)
+                                            rootDirKey++
+                                            garbageDirKey++
                                             if (currentTab == "folder" && fromParent?.name == selectedFolderName) {
-                                                selectedFolderKey = computeDirKey(File(musicDir, selectedFolderName!!))
+                                                selectedFolderKey++
                                             }
                                             scope.launch { showMessage("Moved to garbage") }
 
@@ -502,27 +471,27 @@ fun HomeScreen(navController: NavController, snackbarHostState: SnackbarHostStat
                                         val fromParent = file.parentFile
                                         moveFileToDir(file, musicDir)
                                         if (playingPath == file.absolutePath) playingPath = null
-                                        rootDirKey = computeDirKey(musicDir)
-                                        garbageDirKey = computeDirKey(garbageDir)
+                                        rootDirKey++
+                                        garbageDirKey++
 
                                         if (currentTab == "folder" && fromParent?.name == selectedFolderName) {
-                                            selectedFolderKey = computeDirKey(File(musicDir, selectedFolderName!!))
+                                            selectedFolderKey++
                                         }
                                     },
 
                                     onMoved = {
-                                        rootDirKey = computeDirKey(musicDir)
-                                        garbageDirKey = computeDirKey(garbageDir)
+                                        rootDirKey++
+                                        garbageDirKey++
                                         selectedFolderName?.let {
-                                            selectedFolderKey = computeDirKey(File(musicDir, it))
+                                            selectedFolderKey++
                                         }
                                     },
 
                                     onRenamed = {
-                                        rootDirKey = computeDirKey(musicDir)
-                                        garbageDirKey = computeDirKey(garbageDir)
+                                        rootDirKey++
+                                        garbageDirKey++
                                         selectedFolderName?.let {
-                                            selectedFolderKey = computeDirKey(File(musicDir, it))
+                                            selectedFolderKey++
                                         }
                                     },
                                     onShowMessage = { message ->
@@ -534,29 +503,28 @@ fun HomeScreen(navController: NavController, snackbarHostState: SnackbarHostStat
 
                                 )
 
-                                if (showGarbageConfirmDeleteDialog) {
-                                    ConfirmDialog(
-                                        title = "Delete recording",
-                                        message = "The recording will be permanently deleted and cannot be undone",
-                                        confirmText = "Delete",
-                                        cancelText = "Cancel",
-                                        onConfirm = {
-                                            stopIfPlayingAndCleanup(file, mediaPlayer, playingPath)
-                                            if (file.delete()) {  }
-                                            garbageDirKey = computeDirKey(garbageDir)
-                                        },
-                                        onDismiss = { showGarbageConfirmDeleteDialog = false }
-                                    )
-                                }
-                            }
-
-
-
-                            item {
-                                Spacer(modifier = Modifier.height(140.dp))
                             }
                         }
+
+                        item(key = "bottom_spacer") {
+                            Spacer(modifier = Modifier.height(140.dp))
+                        }
                     }
+                }
+
+                garbageDeleteTarget?.let { target ->
+                    ConfirmDialog(
+                        title = "Delete recording",
+                        message = "The recording will be permanently deleted and cannot be undone",
+                        confirmText = "Delete",
+                        cancelText = "Cancel",
+                        onConfirm = {
+                            stopIfPlayingAndCleanup(target, mediaPlayer, playingPath)
+                            target.delete()
+                            garbageDirKey++
+                        },
+                        onDismiss = { garbageDeleteTarget = null }
+                    )
                 }
 
                 if (showCreateFolderDialog) {
@@ -583,7 +551,7 @@ fun HomeScreen(navController: NavController, snackbarHostState: SnackbarHostStat
                                         scope.launch {
                                             showMessage("Folder \"$name\" created")
                                         }
-                                        rootDirKey = computeDirKey(musicDir)
+                                        rootDirKey++
                                     } else {
                                         scope.launch {
                                             showMessage("Failed to create folder")
@@ -634,8 +602,8 @@ fun HomeScreen(navController: NavController, snackbarHostState: SnackbarHostStat
                                 }
                                 folderToDeleteName = null
                                 showDeleteFolderDialog = false
-                                rootDirKey = computeDirKey(musicDir)
-                                garbageDirKey = computeDirKey(garbageDir)
+                                rootDirKey++
+                                garbageDirKey++
                                 currentTab = "home"
                             }) { Text("Delete", fontWeight = FontWeight.W600, fontSize = 16.sp) }
                         },

@@ -1,6 +1,22 @@
 package com.pranshulgg.recordmaster.screens
 
+import android.Manifest
 import android.content.Context
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.LifecycleOwner
+import com.pranshulgg.recordmaster.helpers.StorageHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -69,11 +85,7 @@ fun SettingsPage(
     var pickedColor = PreferencesHelper.getString("seedColor") ?: "0xff0000FF"
     var currentTheme by remember {
         mutableStateOf(
-<<<<<<< HEAD
             PreferencesHelper.getString("AppTheme") ?: "Dark"
-=======
-            PreferencesHelper.getString("AppTheme") ?: "Light"
->>>>>>> e3e3d76af75a19e16cece744fb352509b1892c05
         )
     }
 
@@ -133,9 +145,165 @@ fun SettingsPage(
 
 
 
+
+    // -------------------- Recordings folder --------------------
+
+    var customPath by remember { mutableStateOf(StorageHelper.customRecordingsPath()) }
+    var accessTick by remember { mutableStateOf(0) }
+    val effectiveDir = remember(customPath, accessTick) { StorageHelper.getRecordingsDir(context) }
+    var showPermissionDialog by remember { mutableStateOf(false) }
+    var pendingPickAfterPermission by remember { mutableStateOf(false) }
+    var pendingChange by remember { mutableStateOf<FolderChange?>(null) }
+
+    fun message(text: String) {
+        scope.launch {
+            snackbarHostState.currentSnackbarData?.dismiss()
+            snackbarHostState.showSnackbar(text)
+        }
+    }
+
+    fun applyFolder(newPath: String?, moveExisting: Boolean) {
+        val oldDir = StorageHelper.getRecordingsDir(context)
+        StorageHelper.setCustomRecordingsPath(newPath)
+        customPath = newPath
+        val newDir = StorageHelper.getRecordingsDir(context)
+        if (moveExisting && oldDir.canonicalPath != newDir.canonicalPath) {
+            scope.launch {
+                val failed = withContext(Dispatchers.IO) { StorageHelper.moveAllRecordings(oldDir, newDir) }
+                snackbarHostState.currentSnackbarData?.dismiss()
+                snackbarHostState.showSnackbar(
+                    if (failed == 0) "Recordings moved" else "$failed item(s) couldn't be moved"
+                )
+            }
+        } else {
+            message("Recordings folder updated")
+        }
+    }
+
+    /** Asks whether to move existing recordings when there are any, otherwise just switches. */
+    fun requestFolderChange(newPath: String?) {
+        val oldDir = StorageHelper.getRecordingsDir(context)
+        val newDir = newPath?.let { File(it) } ?: StorageHelper.defaultRecordingsDir(context)
+        val sameFolder = oldDir.canonicalPath == newDir.canonicalPath
+        val hasRecordings = !oldDir.listFiles().isNullOrEmpty()
+        val nested = StorageHelper.isSameOrInside(newDir, oldDir) ||
+                StorageHelper.isSameOrInside(oldDir, newDir)
+        if (sameFolder) {
+            applyFolder(newPath, moveExisting = false)
+        } else if (hasRecordings && !nested) {
+            pendingChange = FolderChange(newPath)
+        } else {
+            applyFolder(newPath, moveExisting = false)
+        }
+    }
+
+    val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val dir = StorageHelper.treeUriToPath(uri)?.let { File(it) }
+        when {
+            dir == null ->
+                message("That location isn't supported. Pick a folder on internal storage or an SD card")
+            !(dir.isDirectory || dir.mkdirs()) || !dir.canWrite() ->
+                message("Can't write to that folder")
+            else -> requestFolderChange(dir.absolutePath)
+        }
+    }
+
+    val legacyPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        accessTick++
+        if (granted) folderPicker.launch(null) else message("Storage permission is required to choose a folder")
+    }
+
+    fun startPickFolder() {
+        if (StorageHelper.hasStorageAccess(context)) folderPicker.launch(null)
+        else showPermissionDialog = true
+    }
+
+    // Coming back from the "All files access" screen: continue with the picker if it was granted.
+    val lifecycleOwner = context as? LifecycleOwner
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                accessTick++
+                if (pendingPickAfterPermission) {
+                    pendingPickAfterPermission = false
+                    if (StorageHelper.hasStorageAccess(context)) folderPicker.launch(null)
+                }
+            }
+        }
+        lifecycleOwner?.lifecycle?.addObserver(observer)
+        onDispose { lifecycleOwner?.lifecycle?.removeObserver(observer) }
+    }
+
+    if (showPermissionDialog) {
+        AlertDialog(
+            onDismissRequest = { showPermissionDialog = false },
+            title = { Text("Allow access to files") },
+            text = {
+                Text(
+                    "To save recordings in a folder of your choice, RecordMaster needs permission to " +
+                            "manage files on your device."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showPermissionDialog = false
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        pendingPickAfterPermission = true
+                        try {
+                            context.startActivity(StorageHelper.allFilesAccessIntent(context))
+                        } catch (_: Exception) {
+                            try {
+                                context.startActivity(
+                                    android.content.Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                                )
+                            } catch (_: Exception) {
+                                pendingPickAfterPermission = false
+                                message("Couldn't open the permission screen")
+                            }
+                        }
+                    } else {
+                        legacyPermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                    }
+                }) { Text("Continue") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPermissionDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    pendingChange?.let { change ->
+        AlertDialog(
+            onDismissRequest = { pendingChange = null },
+            title = { Text("Move existing recordings?") },
+            text = {
+                Text(
+                    "Move your current recordings and folders to the new location, or leave them " +
+                            "where they are. Recordings left behind won't show up in the app."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingChange = null
+                    applyFolder(change.newPath, moveExisting = true)
+                }) { Text("Move") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    pendingChange = null
+                    applyFolder(change.newPath, moveExisting = false)
+                }) { Text("Don't move") }
+            }
+        )
+    }
+
     val isSysDark = isSystemInDarkTheme()
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             LargeTopAppBar(
                 title = { Text("Settings") },
@@ -233,6 +401,28 @@ fun SettingsPage(
             item {
                 Spacer(Modifier.height(10.dp))
                 SettingSection(
+                    title = "Storage",
+                    tiles = listOfNotNull(
+                        SettingTile.ActionTile(
+                            leading = { SettingsTileIcon(R.drawable.folder_24px) },
+                            title = "Recordings folder",
+                            description = effectiveDir.absolutePath +
+                                    if (customPath != null && customPath != effectiveDir.absolutePath)
+                                        "\nSelected folder unavailable, using default" else "",
+                            onClick = { startPickFolder() }
+                        ),
+                        if (customPath != null) SettingTile.ActionTile(
+                            leading = { SettingsTileIcon(R.drawable.refresh_24px) },
+                            title = "Use default folder",
+                            description = "Save recordings in the app's own storage",
+                            onClick = { requestFolderChange(null) }
+                        ) else null
+                    )
+                )
+            }
+            item {
+                Spacer(Modifier.height(10.dp))
+                SettingSection(
                     title = "Additional",
                     tiles = listOf(
                         SettingTile.ActionTile(
@@ -277,4 +467,4 @@ fun SettingsPage(
     }
 }
 
-
+private data class FolderChange(val newPath: String?)

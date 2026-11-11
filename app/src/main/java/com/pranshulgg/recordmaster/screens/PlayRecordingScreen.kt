@@ -20,10 +20,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-<<<<<<< HEAD
 import androidx.compose.runtime.withFrameNanos
-=======
->>>>>>> e3e3d76af75a19e16cece744fb352509b1892c05
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,20 +37,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.navigation.NavController
-<<<<<<< HEAD
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
-=======
->>>>>>> e3e3d76af75a19e16cece744fb352509b1892c05
 import com.pranshulgg.recordmaster.R
 import com.pranshulgg.recordmaster.ui.components.DropdownMenu
 import com.pranshulgg.recordmaster.ui.components.Symbol
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-<<<<<<< HEAD
+import java.nio.ByteOrder
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.DataInputStream
@@ -63,23 +58,10 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.math.exp
-=======
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.LinkedHashMap
-import java.util.Locale
-import java.util.concurrent.TimeUnit
-import kotlin.random.Random
-import kotlin.math.abs
->>>>>>> e3e3d76af75a19e16cece744fb352509b1892c05
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
-<<<<<<< HEAD
-=======
-import kotlin.system.measureNanoTime
->>>>>>> e3e3d76af75a19e16cece744fb352509b1892c05
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -102,19 +84,15 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
 
     val requestedBarCount = 140
     val maxVisibleBars = 120
-<<<<<<< HEAD
     val waveformCacheFile = remember(filePath) {
         File(context.cacheDir, "waveform_${file.nameWithoutExtension}_${file.lastModified()}_${requestedBarCount}.bin")
     }
-=======
->>>>>>> e3e3d76af75a19e16cece744fb352509b1892c05
 
     val staticAmpsState = remember { mutableStateOf<FloatArray?>(null) }
     var isComputing by remember { mutableStateOf(false) }
 
     LaunchedEffect(filePath) {
         isComputing = true
-<<<<<<< HEAD
         try {
             val cached = withContext(Dispatchers.IO) {
                 readWaveformCache(waveformCacheFile, requestedBarCount)
@@ -130,21 +108,6 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
                     writeWaveformCache(waveformCacheFile, amps)
                 }
             }
-=======
-        val cacheKey = file.absolutePath
-        val cachedPeaks = PeaksCache.get(cacheKey)
-        if (cachedPeaks != null) {
-            staticAmpsState.value = cachedPeaks
-        } else {
-            staticAmpsState.value = placeholderPeaks(requestedBarCount, cacheKey.hashCode())
-        }
-        try {
-            val amps = withContext(Dispatchers.IO) {
-                computePeaksFromAudioFile(file.absolutePath, requestedBarCount)
-            }
-            staticAmpsState.value = amps
-            PeaksCache.put(cacheKey, amps)
->>>>>>> e3e3d76af75a19e16cece744fb352509b1892c05
 
             try {
                 withContext(Dispatchers.IO) {
@@ -167,11 +130,7 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
     LaunchedEffect(isPlaying, player.value) {
         while (isPlaying && player.value != null) {
             currentPos = player.value?.currentPosition ?: 0
-<<<<<<< HEAD
             delay(50)
-=======
-            delay(200)
->>>>>>> e3e3d76af75a19e16cece744fb352509b1892c05
         }
     }
 
@@ -261,7 +220,6 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
 
             var uiProgress by remember { mutableStateOf(0f) }
             var isUserSeeking by remember { mutableStateOf(false) }
-<<<<<<< HEAD
             fun seekToMs(targetMs: Int) {
                 val clamped = targetMs.coerceIn(0, duration)
                 try { player.value?.seekTo(clamped) } catch (_: Exception) {}
@@ -271,8 +229,6 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
             fun seekBy(deltaMs: Int) {
                 seekToMs(currentPos + deltaMs)
             }
-=======
->>>>>>> e3e3d76af75a19e16cece744fb352509b1892c05
 
 
                 Box(
@@ -301,7 +257,6 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
                 )
 
                 if (isComputing && staticAmpsState.value == null) {
-<<<<<<< HEAD
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -312,34 +267,10 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
                             modifier = Modifier.fillMaxWidth(),
                             color = MaterialTheme.colorScheme.primary
                         )
-=======
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceContainer,
-                        modifier = Modifier.matchParentSize(),
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            LoadingIndicator()
-                        }
->>>>>>> e3e3d76af75a19e16cece744fb352509b1892c05
                     }
                 }
             }
 
-<<<<<<< HEAD
-=======
-            val seekBy: (Int) -> Unit = seekBy@{ deltaMs ->
-                val mp = player.value
-                val total = if (duration > 0) duration else mp?.duration ?: 0
-                if (total <= 0) return@seekBy
-                val base = mp?.currentPosition ?: currentPos
-                val target = (base + deltaMs).coerceIn(0, total)
-                try { mp?.seekTo(target) } catch (_: Exception) {}
-                currentPos = target
-                uiProgress = target / total.toFloat()
-                isUserSeeking = false
-            }
-
->>>>>>> e3e3d76af75a19e16cece744fb352509b1892c05
             val interactionSource = remember { MutableInteractionSource() }
             Spacer(Modifier.height(24.dp))
             Column(
@@ -411,11 +342,7 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
                             ),
                             shapes = ButtonDefaults.shapes(),
                             onClick = {
-<<<<<<< HEAD
                                 seekBy(-5_000)
-=======
-                                seekBy(-5000)
->>>>>>> e3e3d76af75a19e16cece744fb352509b1892c05
                             }
 
                         ) {
@@ -452,12 +379,9 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
                                                 setOnPreparedListener { p ->
                                                     duration = p.duration
                                                     player.value = p
-<<<<<<< HEAD
                                                     if (currentPos > 0) {
                                                         try { p.seekTo(currentPos) } catch (_: Exception) {}
                                                     }
-=======
->>>>>>> e3e3d76af75a19e16cece744fb352509b1892c05
                                                     p.start()
                                                     isPlaying = true
                                                 }
@@ -518,11 +442,7 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
                             ),
                             shapes = ButtonDefaults.shapes(),
                             onClick = {
-<<<<<<< HEAD
                                 seekBy(10_000)
-=======
-                                seekBy(10000)
->>>>>>> e3e3d76af75a19e16cece744fb352509b1892c05
                             }
 
                         ) {
@@ -552,7 +472,6 @@ private fun formatMs(ms: Int): String {
     return String.format("%02d:%02d", minutes, seconds)
 }
 
-<<<<<<< HEAD
 private fun readWaveformCache(cacheFile: File, expectedSize: Int): FloatArray? {
     return try {
         if (!cacheFile.exists()) return null
@@ -576,155 +495,139 @@ private fun writeWaveformCache(cacheFile: File, amps: FloatArray) {
         }
     } catch (_: Exception) {
     }
-=======
-private object PeaksCache {
-    private const val MAX_ENTRIES = 24
-    private val cache = LinkedHashMap<String, FloatArray>(MAX_ENTRIES, 0.75f, true)
-
-    fun get(key: String): FloatArray? = cache[key]
-
-    fun put(key: String, value: FloatArray) {
-        cache[key] = value
-        if (cache.size > MAX_ENTRIES) {
-            val eldestKey = cache.entries.iterator().next().key
-            cache.remove(eldestKey)
-        }
-    }
 }
 
-private fun placeholderPeaks(count: Int, seed: Int): FloatArray {
-    val random = Random(seed)
-    val raw = FloatArray(count) { 0.25f + random.nextFloat() * 0.7f }
-    val smoothed = FloatArray(count)
-    for (i in 0 until count) {
-        val prev = raw[max(0, i - 1)]
-        val curr = raw[i]
-        val next = raw[min(count - 1, i + 1)]
-        smoothed[i] = (prev + curr + next) / 3f
-    }
-    return smoothed
->>>>>>> e3e3d76af75a19e16cece744fb352509b1892c05
-}
-
+/**
+ * Decodes [path] and returns [barCount] normalized loudness values (0..1) for the waveform.
+ *
+ * The decoded PCM is reduced to one energy value per small block of samples while decoding, so
+ * memory use stays tiny no matter how long the recording is. (It used to keep every single
+ * sample as a boxed Float in an ArrayList - hundreds of MB and constant GC for long recordings.)
+ */
 suspend fun computePeaksFromAudioFile(path: String, barCount: Int): FloatArray = withContext(Dispatchers.IO) {
     val extractor = MediaExtractor()
-    extractor.setDataSource(path)
-    var audioTrackIndex = -1
-    var format: MediaFormat? = null
-    for (i in 0 until extractor.trackCount) {
-        val f = extractor.getTrackFormat(i)
-        val mime = f.getString(MediaFormat.KEY_MIME) ?: ""
-        if (mime.startsWith("audio/")) {
-            audioTrackIndex = i
-            format = f
-            break
-        }
-    }
-    if (audioTrackIndex < 0 || format == null) {
-        extractor.release()
-        throw IllegalArgumentException("No audio track found")
-    }
-
-    extractor.selectTrack(audioTrackIndex)
-    val mime = format.getString(MediaFormat.KEY_MIME)!!
-
-    val decoder = MediaCodec.createDecoderByType(mime)
-    decoder.configure(format, null, null, 0)
-    decoder.start()
-
-    val sampleList = ArrayList<Float>()
-
-    val inputBufs = decoder.inputBuffers
-    val outputBufs = decoder.outputBuffers
-    val info = MediaCodec.BufferInfo()
-
-    var sawInputEOS = false
-    var sawOutputEOS = false
-
-    while (!sawOutputEOS) {
-        if (!sawInputEOS) {
-            val inIndex = decoder.dequeueInputBuffer(10_000)
-            if (inIndex >= 0) {
-                val inputBuf = inputBufs[inIndex]
-                val sampleSize = extractor.readSampleData(inputBuf, 0)
-                if (sampleSize < 0) {
-                    decoder.queueInputBuffer(inIndex, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-                    sawInputEOS = true
-                } else {
-                    val presentationTimeUs = extractor.sampleTime
-                    decoder.queueInputBuffer(inIndex, 0, sampleSize, presentationTimeUs, 0)
-                    extractor.advance()
-                }
+    var decoder: MediaCodec? = null
+    try {
+        extractor.setDataSource(path)
+        var audioTrackIndex = -1
+        var format: MediaFormat? = null
+        for (i in 0 until extractor.trackCount) {
+            val f = extractor.getTrackFormat(i)
+            val mime = f.getString(MediaFormat.KEY_MIME) ?: ""
+            if (mime.startsWith("audio/")) {
+                audioTrackIndex = i
+                format = f
+                break
             }
         }
+        if (audioTrackIndex < 0 || format == null) {
+            throw IllegalArgumentException("No audio track found")
+        }
 
-        val outIndex = decoder.dequeueOutputBuffer(info, 10_000)
-        when {
-            outIndex >= 0 -> {
-                val outBuf = outputBufs[outIndex]
-                val chunk = ByteArray(info.size)
-                outBuf.get(chunk)
-                outBuf.clear()
-                var i = 0
-                while (i + 1 < chunk.size) {
-                    val low = chunk[i].toInt() and 0xFF
-                    val high = chunk[i + 1].toInt()
-                    val sample = (high shl 8) or low
-                    val signed = if (sample >= 32768) sample - 65536 else sample
-                    val normalized = signed.toFloat() / Short.MAX_VALUE.toFloat()
-                    sampleList.add(normalized)
-                    i += 2
+        extractor.selectTrack(audioTrackIndex)
+        val mime = format.getString(MediaFormat.KEY_MIME)!!
+
+        val codec = MediaCodec.createDecoderByType(mime)
+        decoder = codec
+        codec.configure(format, null, null, 0)
+        codec.start()
+
+        // Energy per block of samples (sum of squares + sample count), grown as needed.
+        val blockSize = 512
+        var blockSums = DoubleArray(1024)
+        var blockCounts = IntArray(1024)
+        var blocks = 0
+        var curSum = 0.0
+        var curCount = 0
+
+        fun pushBlock() {
+            if (blocks == blockSums.size) {
+                blockSums = blockSums.copyOf(blocks * 2)
+                blockCounts = blockCounts.copyOf(blocks * 2)
+            }
+            blockSums[blocks] = curSum
+            blockCounts[blocks] = curCount
+            blocks++
+            curSum = 0.0
+            curCount = 0
+        }
+
+        val info = MediaCodec.BufferInfo()
+        var sawInputEOS = false
+        var sawOutputEOS = false
+
+        while (!sawOutputEOS) {
+            ensureActive() // stop decoding as soon as the user leaves the screen
+
+            if (!sawInputEOS) {
+                val inIndex = codec.dequeueInputBuffer(10_000)
+                if (inIndex >= 0) {
+                    val inputBuf = codec.getInputBuffer(inIndex)!!
+                    val sampleSize = extractor.readSampleData(inputBuf, 0)
+                    if (sampleSize < 0) {
+                        codec.queueInputBuffer(inIndex, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                        sawInputEOS = true
+                    } else {
+                        codec.queueInputBuffer(inIndex, 0, sampleSize, extractor.sampleTime, 0)
+                        extractor.advance()
+                    }
                 }
+            }
 
-                decoder.releaseOutputBuffer(outIndex, false)
-
+            val outIndex = codec.dequeueOutputBuffer(info, 10_000)
+            if (outIndex >= 0) {
+                if (info.size > 0) {
+                    val outBuf = codec.getOutputBuffer(outIndex)
+                    if (outBuf != null) {
+                        outBuf.position(info.offset)
+                        outBuf.limit(info.offset + info.size)
+                        // 16-bit little-endian PCM, read straight from the codec buffer
+                        val shorts = outBuf.order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
+                        while (shorts.hasRemaining()) {
+                            val v = shorts.get() / 32768.0
+                            curSum += v * v
+                            curCount++
+                            if (curCount == blockSize) pushBlock()
+                        }
+                    }
+                }
+                codec.releaseOutputBuffer(outIndex, false)
                 if ((info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                     sawOutputEOS = true
                 }
             }
-            outIndex == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED -> {
+        }
+        if (curCount > 0) pushBlock()
+
+        if (blocks == 0) {
+            return@withContext FloatArray(barCount) { 0.02f + (it % 7) * 0.0045f }
+        }
+
+        // Combine blocks into bars (RMS over each bar's span of blocks).
+        val peaks = FloatArray(barCount)
+        for (b in 0 until barCount) {
+            val from = (b.toLong() * blocks / barCount).toInt()
+            val to = (((b + 1).toLong() * blocks / barCount).toInt()).coerceAtLeast(from + 1).coerceAtMost(blocks)
+            var sumSq = 0.0
+            var count = 0L
+            for (k in from until to) {
+                sumSq += blockSums[k]
+                count += blockCounts[k]
             }
-            outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-            }
+            peaks[b] = if (count > 0) sqrt(sumSq / count).toFloat() else 0f
         }
+
+        val maxVal = peaks.maxOrNull()?.coerceAtLeast(1e-6f) ?: 1f
+        for (i in peaks.indices) peaks[i] = (peaks[i] / maxVal).coerceIn(0f, 1f)
+
+        return@withContext peaks
+    } finally {
+        try { decoder?.stop() } catch (_: Exception) {}
+        try { decoder?.release() } catch (_: Exception) {}
+        extractor.release()
     }
-
-    decoder.stop()
-    decoder.release()
-    extractor.release()
-
-    if (sampleList.isEmpty()) {
-        return@withContext FloatArray(barCount) { 0.02f + (it % 7) * 0.0045f }
-    }
-
-    val totalSamples = sampleList.size
-    val samplesPerBar = max(1, totalSamples / barCount)
-    val peaks = FloatArray(barCount)
-    var sampleIndex = 0
-    for (b in 0 until barCount) {
-        var sumSq = 0.0
-        var count = 0
-        var i = 0
-        while (i < samplesPerBar && sampleIndex < totalSamples) {
-            val s = sampleList[sampleIndex]
-            sumSq += (s * s)
-            count++
-            sampleIndex++
-            i++
-        }
-        if (count > 0) {
-            val rms = sqrt(sumSq / count)
-            peaks[b] = rms.toFloat()
-        } else {
-            peaks[b] = 0f
-        }
-    }
-
-    val maxVal = peaks.maxOrNull()?.coerceAtLeast(1e-6f) ?: 1f
-    for (i in peaks.indices) peaks[i] = (peaks[i] / maxVal).coerceIn(0f, 1f)
-
-    return@withContext peaks
 }
+
 @Composable
 private fun WaveformBars(
     audioSessionId: Int,
@@ -848,7 +751,6 @@ private fun WaveformBars(
     }
 
     LaunchedEffect(barCount) {
-<<<<<<< HEAD
         val attackSpeed = 12f
         val decaySpeed = 6f
         var lastFrameNs = 0L
@@ -862,29 +764,25 @@ private fun WaveformBars(
             val dt = ((frameNs - lastFrameNs).coerceAtMost(50_000_000L)) / 1_000_000_000f
             lastFrameNs = frameNs
 
+            var changed = false
             for (i in 0 until barCount) {
                 val cur = displayAmps.getOrNull(i) ?: 0f
                 val tgt = targetAmps.getOrNull(i) ?: 0f
                 val speed = if (tgt > cur) attackSpeed else decaySpeed
                 val coeff = 1f - exp(-speed * dt)
                 val next = cur + (tgt - cur) * coeff
-                displayAmps[i] = if (next < 0.0005f) 0f else next
+                val newValue = if (next < 0.0005f) 0f else next
+                // Only write when the bar visibly moves; unchanged writes just force redraws.
+                if (kotlin.math.abs(newValue - cur) > 0.0002f) {
+                    displayAmps[i] = newValue
+                    changed = true
+                }
             }
-=======
-        val attack = 0.60f
-        val decay = 0.12f
-        val frameDelay = 33L
-
-        while (true) {
-            for (i in 0 until barCount) {
-                val cur = displayAmps.getOrNull(i) ?: 0f
-                val tgt = targetAmps.getOrNull(i) ?: 0f
-                val coeff = if (tgt > cur) attack else decay
-                val next = cur + (tgt - cur) * coeff
-                displayAmps[i] = if (next < 0.0005f) 0f else next
+            if (!changed) {
+                // Everything has settled: stop asking for a frame every 16 ms until targets move.
+                delay(100)
+                lastFrameNs = 0L
             }
-            delay(frameDelay)
->>>>>>> e3e3d76af75a19e16cece744fb352509b1892c05
         }
     }
 
@@ -953,14 +851,10 @@ private fun WaveformBars(
             val targetScroll = (clamped * totalWidthPx).coerceIn(0f, totalWidthPx)
             if (!scrollState.isScrollInProgress) {
                 try {
-<<<<<<< HEAD
                     scrollState.animateScrollTo(
                         targetScroll.roundToInt(),
                         animationSpec = tween(durationMillis = 120, easing = LinearOutSlowInEasing)
                     )
-=======
-                    scrollState.animateScrollTo(targetScroll.roundToInt())
->>>>>>> e3e3d76af75a19e16cece744fb352509b1892c05
                 } catch (_: Exception) {}
             }
         }
