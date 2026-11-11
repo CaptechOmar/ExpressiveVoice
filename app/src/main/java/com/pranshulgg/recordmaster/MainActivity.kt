@@ -48,7 +48,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.traversalIndex
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
+import androidx.navigation.navArgument
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.pranshulgg.recordmaster.helpers.PreferencesHelper
@@ -133,7 +135,18 @@ class MainActivity : ComponentActivity() {
                 ) {
 
                     composable("homePage") { HomeScreen(navController, snackbarHostState = snackbarHostState) }
-                    composable("record") { RecordingScreen(onDone = { navController.popBackStack() }) }
+                    composable(
+                        "record?autostart={autostart}",
+                        arguments = listOf(navArgument("autostart") {
+                            type = NavType.BoolType
+                            defaultValue = false
+                        })
+                    ) { entry ->
+                        RecordingScreen(
+                            onDone = { navController.popBackStack() },
+                            autoStart = entry.arguments?.getBoolean("autostart") ?: false
+                        )
+                    }
                     composable("OpenSettings") { SettingsPage(
                         navController = navController,
                         context = context,

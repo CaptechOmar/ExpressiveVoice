@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -65,7 +66,7 @@ var mainTitle = "Record"
     ExperimentalAnimationApi::class
 )
 @Composable
-fun RecordingScreen(onDone: () -> Unit) {
+fun RecordingScreen(onDone: () -> Unit, autoStart: Boolean = false) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -83,19 +84,23 @@ fun RecordingScreen(onDone: () -> Unit) {
 
     var showConfirmDeleteDialog by remember { mutableStateOf(false) }
 
+    fun doStartRecording() {
+        startRecording(context, recorderRef, outputFileRef, { started ->
+            if (started) {
+                isRecording = true
+                isPaused = false
+                elapsedSeconds = 0L
+                amplitudes.clear()
+                repeat(maxSamples) { amplitudes.add(0f) }
+            } else coroutineScope.launch { snackbarHostState.showSnackbar("Could not start recorder") }
+        }, namePrefix = "Rec")
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { granted ->
             if (granted) {
-                startRecording(context, recorderRef, outputFileRef, { started ->
-                    if (started) {
-                        isRecording = true
-                        isPaused = false
-                        elapsedSeconds = 0L
-                        amplitudes.clear()
-                        repeat(maxSamples) { amplitudes.add(0f) }
-                    } else coroutineScope.launch { snackbarHostState.showSnackbar("Could not start recorder") }
-                }, namePrefix = "Rec")
+                doStartRecording()
             } else {
                 coroutineScope.launch {
                     snackbarHostState.showSnackbar("Mic permission is required to record")
@@ -103,6 +108,23 @@ fun RecordingScreen(onDone: () -> Unit) {
             }
         }
     )
+
+    /** Starts recording, asking for the microphone permission first if needed. */
+    fun beginRecording() {
+        val permState = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
+        if (permState == PackageManager.PERMISSION_GRANTED) doStartRecording()
+        else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+    }
+
+    // Opened from the big red button: start right away instead of waiting for a second tap.
+    // (Saved so rotating the phone or coming back to this screen doesn't start another recording.)
+    var autoStarted by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (autoStart && !autoStarted) {
+            autoStarted = true
+            beginRecording()
+        }
+    }
 
     LaunchedEffect(isRecording, isPaused) {
         if (isRecording && !isPaused) {
@@ -271,37 +293,7 @@ fun RecordingScreen(onDone: () -> Unit) {
                                     ),
                                     onCheckedChange = {
                                         when {
-                                            !isRecording -> {
-                                                val permState = ContextCompat.checkSelfPermission(
-                                                    context,
-                                                    Manifest.permission.RECORD_AUDIO
-                                                )
-                                                if (permState == PackageManager.PERMISSION_GRANTED) {
-                                                    startRecording(
-                                                        context,
-                                                        recorderRef,
-                                                        outputFileRef,
-                                                        { started ->
-                                                            if (started) {
-                                                                isRecording = true
-                                                                isPaused = false
-                                                                elapsedSeconds = 0L
-                                                                amplitudes.clear()
-                                                                repeat(maxSamples) {
-                                                                    amplitudes.add(
-                                                                        0f
-                                                                    )
-                                                                }
-                                                            } else coroutineScope.launch {
-                                                                snackbarHostState.showSnackbar("Could not start recorder")
-                                                            }
-                                                        },
-                                                        namePrefix = "Rec"
-                                                    )
-                                                } else {
-                                                    permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                                                }
-                                            }
+                                            !isRecording -> beginRecording()
 
                                             isRecording && !isPaused -> {
                                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {

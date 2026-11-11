@@ -61,6 +61,7 @@ import com.pranshulgg.recordmaster.R
 import com.pranshulgg.recordmaster.ui.components.ConfirmDialog
 import com.pranshulgg.recordmaster.ui.components.DrawerContent
 import com.pranshulgg.recordmaster.ui.components.EmptyContainerPlaceholder
+import com.pranshulgg.recordmaster.ui.components.RecordButton
 import com.pranshulgg.recordmaster.ui.components.RecordingRow
 import com.pranshulgg.recordmaster.ui.components.Symbol
 import com.pranshulgg.recordmaster.ui.components.TopBarWithSearch
@@ -267,18 +268,12 @@ fun HomeScreen(navController: NavController, snackbarHostState: SnackbarHostStat
                         animationSpec = motionScheme.defaultSpatialSpec()
                     ) + fadeOut(),
                 ) {
-                    FloatingActionButton(
-                        modifier = Modifier.size(96.dp),
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        onClick = { navController.navigate("record") },
-                        shape = CircleShape
-                    ) {
-                        Symbol(
-                            R.drawable.fiber_manual_record_24px,
-                            size = 36.dp,
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    }
+                    RecordButton(
+                        onClick = {
+                            // launchSingleTop: a double tap must not open (and start) two recorders
+                            navController.navigate("record?autostart=true") { launchSingleTop = true }
+                        }
+                    )
                 }
             },
             topBar = {
