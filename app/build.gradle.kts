@@ -9,7 +9,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.pranshulgg.recordmaster"
+        applicationId = "com.captechomar.recorder"
         minSdk = 24
         targetSdk = 36
         // CI passes these in so every beta/stable build gets a higher versionCode than the last,
