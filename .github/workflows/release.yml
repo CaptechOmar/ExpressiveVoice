@@ -1,17 +1,15 @@
 name: Build & Release
 
-# Every push to any branch (or a manual run) builds ONE signed APK and creates:
-#   - a published pre-release  "beta-<run number>"   (ready to install)
-#   - a DRAFT stable release   "v<base>.<run number>" (edit the notes, then press Publish)
-# Both carry the same APK. They share one applicationId and signing key, and versionCode
-# comes from the run number (only ever goes up), so every build - beta or stable - installs
-# over the previous one without uninstalling.
-#
-# Change VERSION_BASE below to bump the major/minor version (e.g. 1.1).
+# Beta:    every push to ANY branch (or a manual run) -> pre-release "beta-<run number>"
+# Stable:  push a tag like v1.2.0                     -> normal release "v1.2.0"
+# Both are signed with the same key and share one applicationId, so each build installs
+# over the previous one (beta -> beta, beta -> stable, stable -> beta) as long as its
+# versionCode is higher. versionCode comes from the run number, which only ever goes up.
 
 on:
   push:
     branches: ['**']
+    tags: ['v*']
     paths-ignore: ['**.md', 'prev/**', 'fastlane/**']
   workflow_dispatch:
 
@@ -26,7 +24,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VERSION_BASE: '1.0'
       HAS_KEYSTORE: ${{ secrets.KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v4
@@ -44,10 +41,19 @@ jobs:
         id: ver
         run: |
           RUN="${GITHUB_RUN_NUMBER}"
-          echo "code=$((1000 + RUN))" >> "$GITHUB_OUTPUT"   # always increasing
-          echo "name=${VERSION_BASE}.${RUN}" >> "$GITHUB_OUTPUT"
-          echo "beta_tag=beta-${RUN}" >> "$GITHUB_OUTPUT"
-          echo "stable_tag=v${VERSION_BASE}.${RUN}" >> "$GITHUB_OUTPUT"
+          # Always increasing across beta AND stable runs of this workflow.
+          echo "code=$((1000 + RUN))" >> "$GITHUB_OUTPUT"
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "kind=stable" >> "$GITHUB_OUTPUT"
+            echo "name=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            LAST="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)"
+            LAST="${LAST#v}"
+            echo "kind=beta" >> "$GITHUB_OUTPUT"
+            echo "name=${LAST:-1.0.0}-beta.${RUN}" >> "$GITHUB_OUTPUT"
+            echo "tag=beta-${RUN}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Decode signing key
         if: env.HAS_KEYSTORE == 'true'
@@ -85,35 +91,15 @@ jobs:
           name: ${{ steps.apk.outputs.file }}
           path: ${{ steps.apk.outputs.file }}
 
-      - name: Publish beta pre-release
+      - name: Publish release
         if: env.HAS_KEYSTORE == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.ver.outputs.beta_tag }}
+          tag_name: ${{ steps.ver.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          name: RecordMaster beta ${{ github.run_number }}
-          prerelease: true
-          generate_release_notes: true
-          files: ${{ steps.apk.outputs.file }}
-
-      - name: Remove older stable drafts
-        if: env.HAS_KEYSTORE == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # Keep a single pending stable draft (the newest build) instead of piling them up.
-          gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate --jq '.[] | select(.draft) | .id' |
-            while read -r id; do gh api -X DELETE "repos/${GITHUB_REPOSITORY}/releases/${id}"; done
-
-      - name: Create stable release draft
-        if: env.HAS_KEYSTORE == 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.ver.outputs.stable_tag }}
-          target_commitish: ${{ github.sha }}
-          name: RecordMaster ${{ steps.ver.outputs.name }}
-          draft: true
-          prerelease: false
+          name: ${{ steps.ver.outputs.kind == 'stable' && format('RecordMaster {0}', steps.ver.outputs.name) || format('RecordMaster beta {0}', github.run_number) }}
+          prerelease: ${{ steps.ver.outputs.kind == 'beta' }}
+          make_latest: ${{ steps.ver.outputs.kind == 'stable' }}
           generate_release_notes: true
           files: ${{ steps.apk.outputs.file }}
 
