@@ -1,17 +1,16 @@
 name: Build & Release
 
-# Beta:    every push to master (or a manual run) -> pre-release "beta-<run number>"
-# Stable:  push a tag like v1.2.0               -> normal release "v1.2.0"
+# Beta:    every push to ANY branch (or a manual run) -> pre-release "beta-<run number>"
+# Stable:  push a tag like v1.2.0                     -> normal release "v1.2.0"
 # Both are signed with the same key and share one applicationId, so each build installs
 # over the previous one (beta -> beta, beta -> stable, stable -> beta) as long as its
 # versionCode is higher. versionCode comes from the run number, which only ever goes up.
 
 on:
   push:
-    branches: [master]
+    branches: ['**']
     tags: ['v*']
     paths-ignore: ['**.md', 'prev/**', 'fastlane/**']
-  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -93,7 +92,7 @@ jobs:
           path: ${{ steps.apk.outputs.file }}
 
       - name: Publish release
-        if: github.event_name != 'pull_request' && env.HAS_KEYSTORE == 'true'
+        if: env.HAS_KEYSTORE == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
@@ -105,5 +104,5 @@ jobs:
           files: ${{ steps.apk.outputs.file }}
 
       - name: Release skipped (no signing key)
-        if: github.event_name != 'pull_request' && env.HAS_KEYSTORE != 'true'
+        if: env.HAS_KEYSTORE != 'true'
         run: echo "::error::Add the KEYSTORE_BASE64 / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD repository secrets to publish releases." && exit 1
