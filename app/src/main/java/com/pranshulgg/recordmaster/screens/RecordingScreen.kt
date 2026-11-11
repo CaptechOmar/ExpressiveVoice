@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.pranshulgg.recordmaster.helpers.SnackbarManager
 import com.pranshulgg.recordmaster.helpers.StorageHelper
+import com.pranshulgg.recordmaster.ui.components.HapticOnPress
 import com.pranshulgg.recordmaster.ui.components.Symbol
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -370,8 +371,10 @@ fun RecordingScreen(onDone: () -> Unit, autoStart: Boolean = false) {
                             .weight(stopWeight)
                             .alpha(stopAlpha)
                     ) {
+                                val stopInteraction = remember { MutableInteractionSource() }
+                                HapticOnPress(stopInteraction)
                                 Button(
-
+                                    interactionSource = stopInteraction,
                                     onClick = {
                                     stopRecording(recorderRef, outputFileRef) { path ->
                                         isRecording = false

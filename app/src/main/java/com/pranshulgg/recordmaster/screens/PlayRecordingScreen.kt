@@ -41,6 +41,7 @@ import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import com.pranshulgg.recordmaster.R
 import com.pranshulgg.recordmaster.ui.components.DropdownMenu
+import com.pranshulgg.recordmaster.ui.components.HapticOnPress
 import com.pranshulgg.recordmaster.ui.components.Symbol
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -320,6 +321,8 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
             Spacer(modifier = Modifier.height(18.dp))
 
             val interactionSources = remember { List(3) { MutableInteractionSource() } }
+            // Same physical-button click as the record button: -5s, play/pause, +10s
+            interactionSources.forEach { HapticOnPress(it) }
 
 
             ButtonGroup(

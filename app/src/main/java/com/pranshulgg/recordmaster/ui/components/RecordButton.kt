@@ -55,14 +55,7 @@ fun RecordButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val pressed by interactionSource.collectIsPressedAsState()
 
     // Haptics fire on touch-down / touch-up, not on "click", so they feel like a real key.
-    LaunchedEffect(interactionSource) {
-        interactionSource.interactions.collect { interaction ->
-            when (interaction) {
-                is PressInteraction.Press -> Haptics.buttonDown(context)
-                is PressInteraction.Release, is PressInteraction.Cancel -> Haptics.buttonUp(context)
-            }
-        }
-    }
+    HapticOnPress(interactionSource)
 
     val corner: Dp by animateDpAsState(
         targetValue = if (pressed) PressedCorner else RestingCorner,
