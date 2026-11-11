@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -35,9 +36,9 @@ import androidx.compose.ui.unit.sp
 import com.pranshulgg.recordmaster.R
 import com.pranshulgg.recordmaster.helpers.Haptics
 
-// Slightly larger than the pill on the recorder screen (96dp tall, ~211dp wide on a typical phone)
-private val ButtonHeight = 100.dp
-private val ButtonWidth = 222.dp
+// Same size as the Record pill on the recorder screen: 96dp tall, and 60% of the screen width
+// minus that screen's 14dp side padding, so the two buttons match on every phone.
+private val ButtonHeight = 96.dp
 private val RestingCorner = ButtonHeight / 2 // full pill
 private val PressedCorner = 14.dp            // squared-off while held
 
@@ -50,6 +51,7 @@ private val PressedCorner = 14.dp            // squared-off while held
 fun RecordButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val interactionSource = remember { MutableInteractionSource() }
+    val buttonWidth = (LocalConfiguration.current.screenWidthDp - 28).dp * 0.6f
     val pressed by interactionSource.collectIsPressedAsState()
 
     // Haptics fire on touch-down / touch-up, not on "click", so they feel like a real key.
@@ -82,7 +84,7 @@ fun RecordButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
         interactionSource = interactionSource,
         modifier = modifier
             .height(ButtonHeight)
-            .width(ButtonWidth)
+            .width(buttonWidth)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -100,7 +102,7 @@ fun RecordButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
         ) {
             Symbol(
                 R.drawable.fiber_manual_record_24px,
-                size = 28.dp,
+                size = 29.4.dp, // 5% bigger than the 28dp icon on the recorder screen
                 color = MaterialTheme.colorScheme.onErrorContainer
             )
             Spacer(Modifier.width(5.dp))
@@ -108,7 +110,7 @@ fun RecordButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
                 text = "Record",
                 color = MaterialTheme.colorScheme.onErrorContainer,
                 fontWeight = FontWeight.Bold,
-                fontSize = 20.sp
+                fontSize = 21.sp // 5% bigger than the 20sp label on the recorder screen
             )
         }
     }
