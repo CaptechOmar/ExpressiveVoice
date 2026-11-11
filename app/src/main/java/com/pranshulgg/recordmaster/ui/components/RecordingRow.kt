@@ -19,6 +19,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import com.pranshulgg.recordmaster.ui.components.Symbol
+import com.pranshulgg.recordmaster.utils.DurationCache
 import com.pranshulgg.recordmaster.utils.formatMillis
 import com.pranshulgg.recordmaster.utils.moveFileToDir
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -70,10 +71,13 @@ fun RecordingRow(
     val sheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true
     )
-    val sdfDate = SimpleDateFormat("MMM dd", Locale.getDefault())
-    val sdfTime = SimpleDateFormat("hh:mm a", Locale.getDefault())
-    val date = sdfDate.format(Date(file.lastModified()))
-    val time = sdfTime.format(Date(file.lastModified()))
+    // Read the timestamp and format it once per file, not on every recomposition.
+    val modifiedMillis = remember(file.absolutePath) { file.lastModified() }
+    val (date, time) = remember(modifiedMillis) {
+        val modified = Date(modifiedMillis)
+        SimpleDateFormat("MMM dd", Locale.getDefault()).format(modified) to
+                SimpleDateFormat("hh:mm a", Locale.getDefault()).format(modified)
+    }
 
 
 
@@ -86,16 +90,14 @@ fun RecordingRow(
     }
 
 
-    var fileDurationMillis by remember { mutableStateOf(0) }
-    LaunchedEffect(file.absolutePath) {
-        try {
-            val mmr = MediaMetadataRetriever()
-            mmr.setDataSource(file.absolutePath)
-            val dur = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toIntOrNull() ?: 0
-            fileDurationMillis = dur
-            mmr.release()
-        } catch (_: Exception) {
-            fileDurationMillis = 0
+    // Duration is read on a background thread and cached (this used to block the main thread
+    // for every row that scrolled into view).
+    var fileDurationMillis by remember(file.absolutePath, modifiedMillis) {
+        mutableStateOf(DurationCache.get(file.absolutePath, modifiedMillis) ?: 0)
+    }
+    LaunchedEffect(file.absolutePath, modifiedMillis) {
+        if (fileDurationMillis == 0) {
+            fileDurationMillis = DurationCache.load(file.absolutePath, modifiedMillis)
         }
     }
 
@@ -121,13 +123,11 @@ fun RecordingRow(
 
     val folderName = file.parentFile?.name ?: "Unknown"
 
-    val tonedDown = Color(
-        ColorUtils.blendARGB(
-            MaterialTheme.colorScheme.surfaceContainerHigh.toArgb(),
-            MaterialTheme.colorScheme.surface.toArgb(),
-            0.6f
-        )
-    )
+    val surfaceHigh = MaterialTheme.colorScheme.surfaceContainerHigh
+    val surface = MaterialTheme.colorScheme.surface
+    val tonedDown = remember(surfaceHigh, surface) {
+        Color(ColorUtils.blendARGB(surfaceHigh.toArgb(), surface.toArgb(), 0.6f))
+    }
 
     Box (
         modifier = Modifier
@@ -223,16 +223,27 @@ fun RecordingRow(
                 )
 
             Column(modifier = Modifier.padding(end = 16.dp)) {
-                LinearWavyProgressIndicator(
-                    progress = { animatedProgress  },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 6.dp)
-                        .height(5.dp),
-                    wavelength = 20.dp,
-                    amplitude = { _ -> (progress.coerceIn(0f, 1f) * 5.5f).coerceAtMost(1f) }
-
+                // The wavy indicator animates continuously, so only the row that is actually
+                // playing (or paused part-way) uses it; idle rows get a plain flat bar.
+                if (progress > 0f || isThisPlaying) {
+                    LinearWavyProgressIndicator(
+                        progress = { animatedProgress  },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp)
+                            .height(5.dp),
+                        wavelength = 20.dp,
+                        amplitude = { _ -> (progress.coerceIn(0f, 1f) * 5.5f).coerceAtMost(1f) }
                     )
+                } else {
+                    LinearProgressIndicator(
+                        progress = { 0f },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp)
+                            .height(5.dp)
+                    )
+                }
             }
 
             if (showBottomSheet) {
@@ -516,8 +527,6 @@ fun RecordingRow(
                                     )
                                 }
                             )
-<<<<<<< HEAD
-=======
                             ListItem(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(16.dp))
@@ -527,7 +536,6 @@ fun RecordingRow(
                                     Text(formatFileSize(file.length()), fontSize = 12.sp)
                                 }
                             )
->>>>>>> e3e3d76af75a19e16cece744fb352509b1892c05
                         }
                     },
                     confirmButton = {
@@ -542,7 +550,3 @@ fun RecordingRow(
 }
 
 
-<<<<<<< HEAD
-=======
-
->>>>>>> e3e3d76af75a19e16cece744fb352509b1892c05

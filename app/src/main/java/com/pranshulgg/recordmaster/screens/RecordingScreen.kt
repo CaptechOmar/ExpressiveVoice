@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.pranshulgg.recordmaster.helpers.StorageHelper
 import com.pranshulgg.recordmaster.ui.components.Symbol
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -218,7 +219,7 @@ fun RecordingScreen(onDone: () -> Unit) {
                         .background(MaterialTheme.colorScheme.surfaceContainer),
                     contentAlignment = Alignment.Center
                 ) {
-                    Waveform(amplitudes = amplitudes.toList())
+                    Waveform(amplitudes = amplitudes)
                 }
 
 
@@ -429,8 +430,11 @@ private fun Waveform(amplitudes: List<Float>) {
         }
     }
 
+    // `amplitudes` is the same state list for the whole screen's lifetime, so this effect starts
+    // once (it used to restart every ~60 ms because a fresh copy of the list was passed in).
     LaunchedEffect(amplitudes) {
-        val frameDelay = 16L // 60 fps
+        val activeDelay = 16L // ~60 fps while bars are moving
+        val idleDelay = 100L  // nothing to animate: just check occasionally
         val followFactor = 0.15f
 
         while (isActive) {
@@ -439,13 +443,18 @@ private fun Waveform(amplitudes: List<Float>) {
                 repeat(target.size - display.size) { display.add(0f) }
             }
 
+            var changed = false
             for (i in target.indices) {
                 val curr = display.getOrNull(i) ?: 0f
                 val next = curr * (1 - followFactor) + target[i] * followFactor
-                if (i < display.size) display[i] = next else display.add(next)
+                // Skip writes that wouldn't visibly change anything so we don't invalidate the canvas.
+                if (kotlin.math.abs(next - curr) > 0.0005f) {
+                    if (i < display.size) display[i] = next else display.add(next)
+                    changed = true
+                }
             }
 
-            delay(frameDelay)
+            delay(if (changed) activeDelay else idleDelay)
         }
     }
 
@@ -483,13 +492,18 @@ private fun startRecording(
 ) {
     try {
         val time = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val dir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: context.filesDir
-        val count = (dir.listFiles()?.size ?: 0) + 1
-        val fileName =  "${namePrefix}_${String.format(Locale.getDefault(),"%03d", count)}.m4a"
-        val file = File(dir, fileName)
+        val dir = StorageHelper.getRecordingsDir(context)
+        // Pick the first unused number so a new recording can never overwrite an existing one.
+        var count = (dir.listFiles()?.size ?: 0) + 1
+        var fileName: String
+        var file: File
+        do {
+            fileName = "${namePrefix}_${String.format(Locale.getDefault(), "%03d", count)}.m4a"
+            file = File(dir, fileName)
+            count++
+        } while (file.exists())
 
-
-        mainTitle = "${namePrefix}_${String.format(Locale.getDefault(),"%03d", count)}"
+        mainTitle = fileName.removeSuffix(".m4a")
 
 
         val recorder = MediaRecorder().apply {

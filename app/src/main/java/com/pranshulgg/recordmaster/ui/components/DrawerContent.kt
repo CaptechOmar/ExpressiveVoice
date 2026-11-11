@@ -16,7 +16,10 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -44,10 +47,15 @@ fun DrawerContent(
     closeDrawer: () -> Unit
     ) {
 
-    val folders = remember(rootDirKey) {
-        (musicDir.listFiles() ?: emptyArray())
-            .filter { it.isDirectory && it.name != "garbage" }
-            .sortedBy { it.name.lowercase(Locale.getDefault()) }
+    // Folder list and per-folder counts are read on a background thread (the drawer is composed
+    // together with the home screen, so doing this inline would block the first frame).
+    val folderEntries by produceState(emptyList<Pair<File, Int>>(), rootDirKey, musicDir) {
+        value = withContext(Dispatchers.IO) {
+            (musicDir.listFiles() ?: emptyArray())
+                .filter { it.isDirectory && it.name != "garbage" }
+                .sortedBy { it.name.lowercase(Locale.getDefault()) }
+                .map { dir -> dir to (dir.listFiles()?.count { it.isFile } ?: 0) }
+        }
     }
 
     ModalDrawerSheet(
@@ -111,7 +119,7 @@ fun DrawerContent(
             Spacer(modifier = Modifier.height(14.dp))
 
 
-            if(folders.isNotEmpty()) {
+            if(folderEntries.isNotEmpty()) {
                 Text(
                     "Folders", fontSize = 16.sp,
                     color = MaterialTheme.colorScheme.primary,
@@ -121,14 +129,7 @@ fun DrawerContent(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-                val context = LocalContext.current
-                val musicDir = remember {
-                    context.getExternalFilesDir(Environment.DIRECTORY_MUSIC) ?: context.filesDir
-                }
-
-
-                folders.forEach { dir ->
-                    val recordingsCount = dir.listFiles()?.count { it.isFile } ?: 0
+                folderEntries.forEach { (dir, recordingsCount) ->
                     NavigationDrawerItem(
                         label = { Text(dir.name) },
                         selected = currentTab == "folder" && selectedFolderName == dir.name,
