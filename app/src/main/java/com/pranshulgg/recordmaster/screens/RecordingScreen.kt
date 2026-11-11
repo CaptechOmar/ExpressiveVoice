@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.pranshulgg.recordmaster.helpers.SnackbarManager
 import com.pranshulgg.recordmaster.helpers.StorageHelper
 import com.pranshulgg.recordmaster.ui.components.Symbol
 import kotlinx.coroutines.delay
@@ -377,13 +378,11 @@ fun RecordingScreen(onDone: () -> Unit, autoStart: Boolean = false) {
                                         isPaused = false
                                         amplitudes.clear()
                                         elapsedSeconds = 0L
-                                        coroutineScope.launch {
-                                            if (path != null) {
-                                                val fileName = File(path).name
-                                                snackbarHostState.showSnackbar("Saved: $fileName")
-                                            }
-                                            else snackbarHostState.showSnackbar("Save failed")
-                                        }
+                                        // Show the result on the home screen (this screen is about to close)
+                                        SnackbarManager.showMessage(
+                                            if (path != null) "Saved: ${File(path).name}" else "Save failed"
+                                        )
+                                        onDone() // back to the recordings list
                                     }
                                 },
                                     modifier = Modifier.fillMaxWidth().heightIn(ButtonDefaults.LargeContainerHeight),

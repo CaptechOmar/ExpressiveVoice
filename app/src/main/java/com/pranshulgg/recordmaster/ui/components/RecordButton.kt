@@ -35,7 +35,9 @@ import androidx.compose.ui.unit.sp
 import com.pranshulgg.recordmaster.R
 import com.pranshulgg.recordmaster.helpers.Haptics
 
-private val ButtonHeight = 96.dp
+// Slightly larger than the pill on the recorder screen (96dp tall, ~211dp wide on a typical phone)
+private val ButtonHeight = 100.dp
+private val ButtonWidth = 222.dp
 private val RestingCorner = ButtonHeight / 2 // full pill
 private val PressedCorner = 14.dp            // squared-off while held
 
@@ -80,7 +82,7 @@ fun RecordButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
         interactionSource = interactionSource,
         modifier = modifier
             .height(ButtonHeight)
-            .widthIn(min = 220.dp)
+            .width(ButtonWidth)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -92,21 +94,21 @@ fun RecordButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
         shadowElevation = elevation
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 32.dp),
+            modifier = Modifier.padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center
         ) {
             Symbol(
                 R.drawable.fiber_manual_record_24px,
-                size = 32.dp,
+                size = 28.dp,
                 color = MaterialTheme.colorScheme.onErrorContainer
             )
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(5.dp))
             Text(
                 text = "Record",
                 color = MaterialTheme.colorScheme.onErrorContainer,
                 fontWeight = FontWeight.Bold,
-                fontSize = 22.sp
+                fontSize = 20.sp
             )
         }
     }
