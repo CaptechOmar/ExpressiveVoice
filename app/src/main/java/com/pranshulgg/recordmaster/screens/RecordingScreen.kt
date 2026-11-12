@@ -1,7 +1,6 @@
 package com.pranshulgg.recordmaster.screens
 
 import android.Manifest
-import android.media.MediaRecorder
 import android.os.Environment
 import android.util.Log
 import android.content.Context
@@ -47,10 +46,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.pranshulgg.recordmaster.helpers.RecordQuality
+import androidx.activity.compose.BackHandler
+import com.pranshulgg.recordmaster.RecordingService
+import com.pranshulgg.recordmaster.helpers.PreferencesHelper
+import com.pranshulgg.recordmaster.helpers.RecorderController
 import com.pranshulgg.recordmaster.helpers.SnackbarManager
 import com.pranshulgg.recordmaster.utils.WaveformCache
-import com.pranshulgg.recordmaster.helpers.StorageHelper
 import com.pranshulgg.recordmaster.ui.components.HapticOnPress
 import com.pranshulgg.recordmaster.ui.components.Symbol
 import kotlinx.coroutines.delay
@@ -64,8 +65,6 @@ import com.pranshulgg.recordmaster.R
 import com.pranshulgg.recordmaster.ui.components.ConfirmDialog
 
 
-var mainTitle = "Record"
-
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class,
     ExperimentalAnimationApi::class
 )
@@ -75,35 +74,33 @@ fun RecordingScreen(onDone: () -> Unit, autoStart: Boolean = false) {
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
-    var isRecording by remember { mutableStateOf(false) }
-    var isPaused by remember { mutableStateOf(false) }
+    val status by RecorderController.status.collectAsState()
+    val isRecording = status != RecorderController.Status.IDLE
+    val isPaused = status == RecorderController.Status.PAUSED
     var elapsedSeconds by remember { mutableStateOf(0L) }
 
-    val recorderRef = remember { mutableStateOf<MediaRecorder?>(null) }
-    val outputFileRef = remember { mutableStateOf<File?>(null) }
-
+    val fileName by RecorderController.fileName.collectAsState()
+    var shownTitle by remember { mutableStateOf("Record") }
+    LaunchedEffect(fileName) { fileName?.let { shownTitle = it.removeSuffix(".m4a") } }
 
     val amplitudes = remember { mutableStateListOf<Float>() }
     val maxSamples = 40
 
     var showConfirmDeleteDialog by remember { mutableStateOf(false) }
 
+    // Recording itself runs in a foreground service (with the live notification), so it keeps
+    // going if the app goes to the background.
     fun doStartRecording() {
-        startRecording(context, recorderRef, outputFileRef, { started ->
-            if (started) {
-                isRecording = true
-                isPaused = false
-                elapsedSeconds = 0L
-                amplitudes.clear()
-                repeat(maxSamples) { amplitudes.add(0f) }
-            } else coroutineScope.launch { snackbarHostState.showSnackbar("Could not start recorder") }
-        }, namePrefix = "Rec")
+        if (!RecorderController.isActive) RecordingService.start(context)
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { granted ->
-            if (granted) {
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+        onResult = { results ->
+            if (results[Manifest.permission.RECORD_AUDIO] != false &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
+            ) {
                 doStartRecording()
             } else {
                 coroutineScope.launch {
@@ -113,70 +110,82 @@ fun RecordingScreen(onDone: () -> Unit, autoStart: Boolean = false) {
         }
     )
 
-    /** Starts recording, asking for the microphone permission first if needed. */
+    /** Starts recording, asking for the microphone (and notification) permission first if needed. */
     fun beginRecording() {
-        val permState = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
-        if (permState == PackageManager.PERMISSION_GRANTED) doStartRecording()
-        else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        val needed = mutableListOf<String>()
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) !=
+            PackageManager.PERMISSION_GRANTED
+        ) needed += Manifest.permission.RECORD_AUDIO
+        // Needed to show the recording notification; asked once, recording works without it.
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED &&
+            !(PreferencesHelper.getBool("asked_notification_permission") == true)
+        ) {
+            needed += Manifest.permission.POST_NOTIFICATIONS
+            PreferencesHelper.setBool("asked_notification_permission", true)
+        }
+        if (needed.isEmpty()) doStartRecording()
+        else permissionLauncher.launch(needed.toTypedArray())
     }
 
     // Opened from the big red button: start right away instead of waiting for a second tap.
     // (Saved so rotating the phone or coming back to this screen doesn't start another recording.)
     var autoStarted by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        if (autoStart && !autoStarted) {
+        if (autoStart && !autoStarted && !RecorderController.isActive) {
             autoStarted = true
             beginRecording()
         }
     }
 
+    // The recording was stopped (here, or from the notification): confirm and go back to the list.
+    LaunchedEffect(Unit) {
+        RecorderController.finished.collect { path ->
+            if (path != null) WaveformCache.warmUp(context, listOf(File(path)))
+            SnackbarManager.showMessage(
+                if (path != null) "Saved: ${File(path).name}" else "Save failed"
+            )
+            onDone()
+        }
+    }
+    LaunchedEffect(Unit) {
+        RecorderController.startFailed.collect {
+            snackbarHostState.showSnackbar("Could not start recorder")
+        }
+    }
+
+    // Leaving while recording saves it, like Stop.
+    BackHandler(enabled = isRecording) { RecorderController.stop() }
+
+    LaunchedEffect(isRecording) {
+        if (isRecording) {
+            if (amplitudes.isEmpty()) repeat(maxSamples) { amplitudes.add(0f) }
+        } else {
+            amplitudes.clear()
+            elapsedSeconds = 0L
+        }
+    }
+
+    LaunchedEffect(isRecording, isPaused) {
+        while (isRecording) {
+            elapsedSeconds = RecorderController.elapsedMs() / 1000
+            delay(250)
+        }
+    }
+
     LaunchedEffect(isRecording, isPaused) {
         if (isRecording && !isPaused) {
-            while (isRecording && !isPaused) {
-                delay(1000)
-                elapsedSeconds += 1
-            }
-        }
-    }
-
-    LaunchedEffect(isRecording, isPaused, recorderRef.value) {
-        if (isRecording && !isPaused && recorderRef.value != null) {
-            try {
-                val amp = recorderRef.value?.maxAmplitude
-            } catch (e: Exception) {
-                Log.w("RecordingScreen", "prime amp failed", e)
-            }
-
+            RecorderController.maxAmplitude() // the first read is always 0
             var prev = amplitudes.lastOrNull() ?: 0f
 
-            while (isRecording && !isPaused && recorderRef.value != null) {
-                try {
-                    val amp = recorderRef.value?.maxAmplitude ?: 0
-                    val normalized = (amp / 32767f).coerceIn(0f, 1f)
-                    val smoothed = prev * 0.85f + normalized * 0.15f
-                    amplitudes.add(smoothed)
-                    if (amplitudes.size > maxSamples) amplitudes.removeAt(0)
-                    prev = smoothed
-                } catch (e: Exception) {
-                    Log.w("RecordingScreen", "amp poll failed", e)
-                }
+            while (isRecording && !isPaused) {
+                val normalized = (RecorderController.maxAmplitude() / 32767f).coerceIn(0f, 1f)
+                val smoothed = prev * 0.85f + normalized * 0.15f
+                amplitudes.add(smoothed)
+                if (amplitudes.size > maxSamples) amplitudes.removeAt(0)
+                prev = smoothed
                 delay(60) // 16-20 samples per second
-            }
-        }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            try {
-                recorderRef.value?.let { rec ->
-                    try { rec.stop() } catch (_: Exception) {}
-                    try { rec.reset() } catch (_: Exception) {}
-                    try { rec.release() } catch (_: Exception) {}
-                }
-            } catch (e: Exception) {
-                Log.w("RecordingScreen", "cleanup error", e)
-            } finally {
-                recorderRef.value = null
             }
         }
     }
@@ -185,11 +194,11 @@ fun RecordingScreen(onDone: () -> Unit, autoStart: Boolean = false) {
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = {Text(mainTitle)},
+                title = {Text(shownTitle)},
                 subtitle = {Text(SimpleDateFormat("MMM dd 'at' h:mm a", Locale.getDefault()).format(Date()))},
                 navigationIcon = {
                     IconButton(
-                        onClick = {onDone()}
+                        onClick = { if (isRecording) RecorderController.stop() else onDone() }
                     ) {
                         Symbol(R.drawable.arrow_back_24px, color = MaterialTheme.colorScheme.onSurface)
                     }
@@ -208,13 +217,7 @@ fun RecordingScreen(onDone: () -> Unit, autoStart: Boolean = false) {
                             confirmText = "Delete",
                             cancelText = "Cancel",
                             onConfirm = {
-                                outputFileRef.value?.let { file ->
-                                    if (file.exists()) file.delete()
-                                }
-                                recorderRef.value = null
-                                outputFileRef.value = null
-                                isRecording = false
-                                isPaused = false
+                                RecorderController.discard()
                                 onDone()
                             },
                             onDismiss = { showConfirmDeleteDialog = false }
@@ -298,48 +301,14 @@ fun RecordingScreen(onDone: () -> Unit, autoStart: Boolean = false) {
                                     onCheckedChange = {
                                         when {
                                             !isRecording -> beginRecording()
-
-                                            isRecording && !isPaused -> {
-                                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                                                    try {
-                                                        recorderRef.value?.pause()
-                                                        isPaused = true
-                                                    } catch (e: Exception) {
-                                                        Log.w("RecordingScreen", "pause failed", e)
-                                                        coroutineScope.launch {
-                                                            snackbarHostState.showSnackbar(
-                                                                "Pause failed on this device"
-                                                            )
-                                                        }
-                                                    }
-                                                } else {
-                                                    coroutineScope.launch {
-                                                        snackbarHostState.showSnackbar(
-                                                            "Pause not supported on this device"
-                                                        )
-                                                    }
+                                            !isPaused -> if (!RecorderController.pause()) {
+                                                coroutineScope.launch {
+                                                    snackbarHostState.showSnackbar("Pause failed on this device")
                                                 }
                                             }
-
-                                            isRecording && isPaused -> {
-                                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                                                    try {
-                                                        recorderRef.value?.resume()
-                                                        isPaused = false
-                                                    } catch (e: Exception) {
-                                                        Log.w("RecordingScreen", "resume failed", e)
-                                                        coroutineScope.launch {
-                                                            snackbarHostState.showSnackbar(
-                                                                "Resume failed on this device"
-                                                            )
-                                                        }
-                                                    }
-                                                } else {
-                                                    coroutineScope.launch {
-                                                        snackbarHostState.showSnackbar(
-                                                            "Resume not supported on this device"
-                                                        )
-                                                    }
+                                            else -> if (!RecorderController.resume()) {
+                                                coroutineScope.launch {
+                                                    snackbarHostState.showSnackbar("Resume failed on this device")
                                                 }
                                             }
                                         }
@@ -377,20 +346,7 @@ fun RecordingScreen(onDone: () -> Unit, autoStart: Boolean = false) {
                                 HapticOnPress(stopInteraction)
                                 Button(
                                     interactionSource = stopInteraction,
-                                    onClick = {
-                                    stopRecording(recorderRef, outputFileRef) { path ->
-                                        isRecording = false
-                                        isPaused = false
-                                        amplitudes.clear()
-                                        elapsedSeconds = 0L
-                                        if (path != null) WaveformCache.warmUp(context, listOf(File(path)))
-                                        // Show the result on the home screen (this screen is about to close)
-                                        SnackbarManager.showMessage(
-                                            if (path != null) "Saved: ${File(path).name}" else "Save failed"
-                                        )
-                                        onDone() // back to the recordings list
-                                    }
-                                },
+                                    onClick = { RecorderController.stop() },
                                     modifier = Modifier.fillMaxWidth().heightIn(ButtonDefaults.LargeContainerHeight),
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = MaterialTheme.colorScheme.errorContainer
@@ -478,98 +434,6 @@ private fun Waveform(amplitudes: List<Float>) {
             )
         }
     }
-}
-
-private fun startRecording(
-    context: Context,
-    recorderRef: MutableState<MediaRecorder?>,
-    outputFileRef: MutableState<File?>,
-    callback: (Boolean) -> Unit,
-    namePrefix: String = "REC"
-) {
-    try {
-        val time = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-        val dir = StorageHelper.getRecordingsDir(context)
-        // Pick the first unused number so a new recording can never overwrite an existing one.
-        var count = (dir.listFiles()?.size ?: 0) + 1
-        var fileName: String
-        var file: File
-        do {
-            fileName = "${namePrefix}_${String.format(Locale.getDefault(), "%03d", count)}.m4a"
-            file = File(dir, fileName)
-            count++
-        } while (file.exists())
-
-        mainTitle = fileName.removeSuffix(".m4a")
-
-
-        fun buildRecorder(quality: RecordQuality): MediaRecorder {
-            val r = MediaRecorder()
-            try {
-                r.apply {
-                    setAudioSource(MediaRecorder.AudioSource.MIC)
-                    setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-                    setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                    setAudioSamplingRate(quality.sampleRate)
-                    setAudioEncodingBitRate(quality.bitRate)
-                    setOutputFile(file.absolutePath)
-                    prepare()
-                    start()
-                }
-                return r
-            } catch (e: Exception) {
-                try { r.release() } catch (_: Exception) {}
-                throw e
-            }
-        }
-
-        val chosen = RecordQuality.current()
-        val recorder = try {
-            buildRecorder(chosen)
-        } catch (e: Exception) {
-            // Some phones reject certain sample rates / bit rates: fall back to the safe default.
-            if (chosen == RecordQuality.STANDARD) throw e
-            Log.w("RecordingScreen", "quality ${chosen.key} not supported, using standard", e)
-            buildRecorder(RecordQuality.STANDARD)
-        }
-
-        try {
-            val amp = recorder.maxAmplitude
-        } catch (e: Exception) {
-            Log.w("RecordingScreen", "prime amp after start failed", e)
-        }
-
-        recorderRef.value = recorder
-        outputFileRef.value = file
-        callback(true)
-    } catch (e: Exception) {
-        Log.e("RecordingScreen", "startRecording error", e)
-        try { recorderRef.value?.release() } catch (_: Exception) {}
-        recorderRef.value = null
-        outputFileRef.value = null
-        callback(false)
-    }
-}
-
-private fun stopRecording(
-    recorderRef: MutableState<MediaRecorder?>,
-    outputFileRef: MutableState<File?>,
-    callback: (String?) -> Unit
-) {
-    val recorder = recorderRef.value
-    val outFile = outputFileRef.value
-    try {
-        recorder?.let {
-            try { it.stop() } catch (e: Exception) { Log.w("RecordingScreen", "stop() threw", e) }
-            try { it.reset() } catch (_: Exception) {}
-            try { it.release() } catch (_: Exception) {}
-        }
-    } catch (e: Exception) {
-        Log.w("RecordingScreen", "error stopping/releasing", e)
-    } finally {
-        recorderRef.value = null
-    }
-    callback(outFile?.absolutePath)
 }
 
 private fun formatElapsed(seconds: Long): String {
