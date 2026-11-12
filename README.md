@@ -69,7 +69,7 @@ Expressive Voice is a fork of [RecordMaster](https://github.com/PranshulGG/Recor
 
 # ✉️ Contact
 
-For any questions or feedback, feel free to open an issue on GitHub or contact pranshul.devmain@gmail.com or syedmuhammadahmernaqvi@gmail.com
+For any questions or feedback, feel free to open an issue on GitHub or contact omar.ashraf1md@gmail.com
 
 # ©️ License
 
