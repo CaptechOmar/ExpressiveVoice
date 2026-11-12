@@ -75,7 +75,7 @@ jobs:
         id: apk
         run: |
           APK="$(ls app/build/outputs/apk/release/*.apk | head -n1)"
-          OUT="RecordMaster-${{ steps.ver.outputs.name }}.apk"
+          OUT="ExpressiveVoice-${{ steps.ver.outputs.name }}.apk"
           cp "$APK" "$OUT"
           if [[ "$HAS_KEYSTORE" == "true" ]]; then
             APKSIGNER="$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n1)"
@@ -91,16 +91,27 @@ jobs:
           name: ${{ steps.apk.outputs.file }}
           path: ${{ steps.apk.outputs.file }}
 
+      - name: Pick release notes
+        id: notes
+        run: |
+          # A stable tag like v2.0 uses .github/release-notes/v2.0.md when it exists.
+          if [[ -f ".github/release-notes/${{ steps.ver.outputs.tag }}.md" ]]; then
+            echo "path=.github/release-notes/${{ steps.ver.outputs.tag }}.md" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish release
         if: env.HAS_KEYSTORE == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.ver.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          name: ${{ steps.ver.outputs.kind == 'stable' && format('RecordMaster {0}', steps.ver.outputs.name) || format('RecordMaster beta {0}', github.run_number) }}
+          name: ${{ steps.ver.outputs.kind == 'stable' && format('Expressive Voice {0}', steps.ver.outputs.name) || format('Expressive Voice beta {0}', github.run_number) }}
           prerelease: ${{ steps.ver.outputs.kind == 'beta' }}
           make_latest: ${{ steps.ver.outputs.kind == 'stable' }}
-          generate_release_notes: true
+          body_path: ${{ steps.notes.outputs.path }}
+          generate_release_notes: ${{ steps.notes.outputs.path == '' }}
           files: ${{ steps.apk.outputs.file }}
 
       - name: Release skipped (no signing key)

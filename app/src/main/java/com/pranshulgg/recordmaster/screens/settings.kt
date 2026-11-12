@@ -245,7 +245,7 @@ fun SettingsPage(
             title = { Text("Allow access to files") },
             text = {
                 Text(
-                    "To save recordings in a folder of your choice, RecordMaster needs permission to " +
+                    "To save recordings in a folder of your choice, Expressive Voice needs permission to " +
                             "manage files on your device."
                 )
             },

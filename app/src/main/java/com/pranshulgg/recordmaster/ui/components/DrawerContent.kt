@@ -68,7 +68,7 @@ fun DrawerContent(
         ) {
             item {
         Text(
-            "RecordMaster",
+            "Expressive Voice",
             modifier = Modifier.padding(16.dp, bottom = 0.dp, end = 16.dp, top = 16.dp),
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.primary

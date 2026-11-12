@@ -1,3 +1,5 @@
 <resources>
-    <string name="app_name">RecordMaster</string>
+    <string name="app_name">Expressive Voice</string>
+    <!-- Name under the launcher icon -->
+    <string name="launcher_label">Recorder</string>
 </resources>

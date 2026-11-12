@@ -1,4 +1,4 @@
-<p><i>RecordMaster</i> inspired by the Google Pixel Recorder app, but with more features</p>
+<p><i>Expressive Voice</i> inspired by the Google Pixel Recorder app, but with more features</p>
 
 <p><br><b>Features:</b></p>
 <li><b>✨ More features will be added in future updates.</b></li>

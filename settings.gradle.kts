@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "RecordMaster"
+rootProject.name = "ExpressiveVoice"
 include(":app")

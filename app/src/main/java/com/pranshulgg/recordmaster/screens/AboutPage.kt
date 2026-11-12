@@ -103,13 +103,17 @@ fun AboutScreen(snackbarHostState: SnackbarHostState, navController: NavControll
                             )
                         ) {
                             Text(
-                                "RecordMaster",
+                                "Expressive Voice",
                                 fontSize = 24.sp,
                                 color = MaterialTheme.colorScheme.secondary
                             )
                             CheckForUpdateBtn(
-                                currentVersion = "v1.1.0",
-                                githubRepo = "PranshulGG/RecordMaster",
+                                currentVersion = LocalContext.current.let { c ->
+                                    "v" + (try {
+                                        c.packageManager.getPackageInfo(c.packageName, 0).versionName
+                                    } catch (_: Exception) { null } ?: "")
+                                },
+                                githubRepo = "CaptechOmar/ExpressiveVoice",
                                 snackbarHostState = snackbarHostState
                             )
                         }
@@ -159,7 +163,7 @@ fun AboutScreen(snackbarHostState: SnackbarHostState, navController: NavControll
                 modifier = Modifier
                     .clickable(
                         onClick = {
-                            uriHandler.openUri("https://github.com/PranshulGG/RecordMaster")
+                            uriHandler.openUri("https://github.com/CaptechOmar/ExpressiveVoice")
                         }
                     )
                     .height(68.dp)
@@ -171,7 +175,7 @@ fun AboutScreen(snackbarHostState: SnackbarHostState, navController: NavControll
                 modifier = Modifier
                     .clickable(
                         onClick = {
-                            uriHandler.openUri("https://github.com/PranshulGG/RecordMaster/issues/")
+                            uriHandler.openUri("https://github.com/CaptechOmar/ExpressiveVoice/issues/")
                         }
                     )
                     .height(68.dp)
@@ -235,7 +239,7 @@ fun AboutScreen(snackbarHostState: SnackbarHostState, navController: NavControll
 @Composable
 fun CheckForUpdateBtn(
     currentVersion: String,
-    githubRepo: String = "PranshulGG/RecordMaster",
+    githubRepo: String = "CaptechOmar/ExpressiveVoice",
     snackbarHostState: SnackbarHostState? = null
 ) {
     val ctx = LocalContext.current
@@ -357,7 +361,7 @@ fun TermsPage(navController: NavController) {
 
 
     val markdownData = """
-These Terms & Conditions apply to the **RecordMaster** app (the "Application") for mobile devices.  
+These Terms & Conditions apply to the **Expressive Voice** app (the "Application") for mobile devices.  
 This app was created by **Pranshul** as an open-source, hobby project. By using the Application, you agree to the following:  
 
 ## Use of the Application  
@@ -440,7 +444,7 @@ fun PolicyPage(navController: NavController) {
 
 
     val markdownData = """
-RecordMaster is an open-source application.  
+Expressive Voice is an open-source application, forked from RecordMaster by Pranshul.  
 
 We respect your privacy. This application:  
 
@@ -461,7 +465,7 @@ This application does not knowingly collect any personal information from anyone
 If this Privacy Policy changes, we will update it here. Continued use of the app after changes means you accept the revised policy.  
 
 ## Contact  
-If you have any questions about privacy while using RecordMaster, please contact us at:  
+If you have any questions about privacy while using Expressive Voice, please contact us at:  
 📧 **pranshul.devmain@gmail.com**  
 
 """

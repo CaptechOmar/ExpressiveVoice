@@ -3,33 +3,33 @@
 </div>
 
 <h1 align="center">
-   RecordMaster V1.5
+   Expressive Voice
 </h1>
 
 <div align="center">
 
-<img src="https://img.shields.io/github/license/Syed-Muhammad-Ahmer/RecordMaster_1.5?style=for-the-badge&color=cba6f7&labelColor=302D41">
+<img src="https://img.shields.io/github/license/CaptechOmar/ExpressiveVoice?style=for-the-badge&color=cba6f7&labelColor=302D41">
 
-<img src="https://img.shields.io/github/last-commit/Syed-Muhammad-Ahmer/RecordMaster_1.5?style=for-the-badge&color=b1d18a&labelColor=1f3701">
+<img src="https://img.shields.io/github/last-commit/CaptechOmar/ExpressiveVoice?style=for-the-badge&color=b1d18a&labelColor=1f3701">
 
 <br>
 
-<img src="https://img.shields.io/github/v/release/Syed-Muhammad-Ahmer/RecordMaster_1.5?style=for-the-badge&color=dbc66e&labelColor=3a3000">
+<img src="https://img.shields.io/github/v/release/CaptechOmar/ExpressiveVoice?style=for-the-badge&color=dbc66e&labelColor=3a3000">
 
 <br><br>
 
 </div>
  <div align="center">
 
-[Contact](https://github.com/PranshulGG/RecordMaster?tab=readme-ov-file#contact) • [License](https://github.com/PranshulGG/RecordMaster?tab=readme-ov-file#license)
+[Contact](#️-contact) • [License](#️-license)
 
  </div>
        <div align="center">
-   <h3>RecordMaster: inspired by the Google Pixel Recorder app</h3>
+   <h3>Expressive Voice: a Material 3 Expressive voice recorder, inspired by the Google Pixel Recorder app</h3>
 
    </div>
 <div align="center">
- <a href="https://github.com/Syed-Muhammad-Ahmer/RecordMaster_1.5/releases"><img alt="GitHub" src="https://user-images.githubusercontent.com/69304392/148696068-0cfea65d-b18f-4685-82b5-329a330b1c0d.png" height="80"/></a>
+ <a href="https://github.com/CaptechOmar/ExpressiveVoice/releases"><img alt="GitHub" src="https://user-images.githubusercontent.com/69304392/148696068-0cfea65d-b18f-4685-82b5-329a330b1c0d.png" height="80"/></a>
    </div>
 <br>
 
@@ -52,13 +52,20 @@
 
 <br>
 
-# 📝 Recent updates
+# 📝 What's new in 2.0
 
-- Added an Info action in the recording three-dot menu with a dialog that shows name, date, and location.
-- Restyled the Info dialog to feel more Material 3 Expressive, with rounder subsections and smaller text so full paths show without truncation.
-- Removed pause/resume snackbar notifications as they were redundant.
-- Updated the save snackbar to show a user-friendly saved name.
-- Open the keyboard automatically when tapping the search icon, keeping the UI aligned with Material 3 design principles.
+- Recording quality setting (Low / Standard / High / Maximum).
+- Choose where recordings are saved.
+- One-tap recording from the home screen, with a pill-shaped Record button and haptic feedback.
+- Scrubbing the progress bar shows the exact time you are at.
+- Wiki Reader-style grouped settings.
+- Faster lists and faster opening of recordings.
+
+Shows as **Recorder** under the launcher icon. Package name: `com.captechomar.recorder`.
+
+# 🙏 Credits
+
+Expressive Voice is a fork of [RecordMaster](https://github.com/PranshulGG/RecordMaster) by PranshulGG and contributors.
 
 # ✉️ Contact
 
