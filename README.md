@@ -35,15 +35,21 @@
 
 # 👁️ Screenshots
 
-<div align="center">
-  <img src="prev/home.jpg" width="250">
-  <img src="prev/recording.jpg" width="250">
-  <img src="prev/player.jpg" width="250">
-   <img src="prev/playerpaused.jpg" width="250">
-   <img src="prev/settings.jpg" width="250">
-   <img src="prev/live.jpg" width="250">
-   <img src="prev/livesmall.jpg" width="250">
-</div>
+<table align="center">
+  <tr>
+    <td align="center"><img src="prev/home.jpg" width="250"></td>
+    <td align="center"><img src="prev/recording.jpg" width="250"></td>
+    <td align="center"><img src="prev/player.jpg" width="250"></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="prev/playerpaused.jpg" width="250"></td>
+    <td align="center"><img src="prev/settings.jpg" width="250"></td>
+    <td align="center">
+      <img src="prev/live.jpg" width="250"><br><br>
+      <img src="prev/livesmall.jpg" width="250">
+    </td>
+  </tr>
+</table>
 
 
 <br>
