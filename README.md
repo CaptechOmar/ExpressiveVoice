@@ -52,7 +52,12 @@
 
 <br>
 
-# 📝 What's new in 2.0
+# 📝 What's new in 2.5
+
+- Live recording notification with Pause/Resume and Stop, and recording that continues in the background.
+- Update checker fixed.
+
+## 2.0
 
 - Recording quality setting (Low / Standard / High / Maximum).
 - Choose where recordings are saved.
