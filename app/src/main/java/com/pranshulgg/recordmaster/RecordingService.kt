@@ -139,6 +139,11 @@ class RecordingService : Service() {
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setColor(ContextCompat.getColor(this, android.R.color.holo_red_dark))
+            // Android 16 "live update": shown as a status-bar chip / on the lock screen, and picked
+            // up by apps that mirror live notifications.
+            .addExtras(android.os.Bundle().apply {
+                putBoolean("android.requestPromotedOngoing", true)
+            })
 
         if (paused) {
             // The clock stops while paused, so show the frozen time instead of a running one.

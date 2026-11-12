@@ -332,7 +332,7 @@ fun RecordingScreen(onDone: () -> Unit, autoStart: Boolean = false) {
                                 }
                     }
 
-                    val stopVisible by remember { derivedStateOf { isRecording } }
+                    val stopVisible = isRecording
 
                     val stopAlpha by animateFloatAsState(if (stopVisible) 1f else 0f)
                     val stopWeight by animateFloatAsState(if (stopVisible) 1f else 0.001f)

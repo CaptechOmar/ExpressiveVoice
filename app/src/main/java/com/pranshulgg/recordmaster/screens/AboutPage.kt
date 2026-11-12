@@ -146,12 +146,12 @@ fun AboutScreen(snackbarHostState: SnackbarHostState, navController: NavControll
             )
             ListItem(
                 headlineContent = { Text("Email") },
-                supportingContent = { Text("pranshul.devmain@gmail.com") },
+                supportingContent = { Text("omar.ashraf1md@gmail.com") },
                 leadingContent = { IconAvatarLeading(R.drawable.mail_24px) },
                 modifier = Modifier
                     .clickable(
                         onClick = {
-                            uriHandler.openUri("mailto:pranshul.devmain@gmail.com")
+                            uriHandler.openUri("mailto:omar.ashraf1md@gmail.com")
                         }
                     )
                     .height(68.dp)
@@ -389,7 +389,7 @@ These Terms & Conditions may be updated in the future. Updates will be posted in
 
 ## Contact  
 If you have any questions about these Terms & Conditions, please contact:  
-📧 **pranshul.devmain@gmail.com**
+📧 **omar.ashraf1md@gmail.com**
 """
 
     Scaffold(
@@ -466,7 +466,7 @@ If this Privacy Policy changes, we will update it here. Continued use of the app
 
 ## Contact  
 If you have any questions about privacy while using Expressive Voice, please contact us at:  
-📧 **pranshul.devmain@gmail.com**  
+📧 **omar.ashraf1md@gmail.com**  
 
 """
 
