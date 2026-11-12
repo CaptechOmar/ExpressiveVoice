@@ -43,6 +43,7 @@ import com.pranshulgg.recordmaster.R
 import com.pranshulgg.recordmaster.ui.components.DropdownMenu
 import com.pranshulgg.recordmaster.ui.components.HapticOnPress
 import com.pranshulgg.recordmaster.ui.components.Symbol
+import com.pranshulgg.recordmaster.utils.WaveformCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -83,43 +84,87 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
-    val requestedBarCount = 140
     val maxVisibleBars = 120
-    val waveformCacheFile = remember(filePath) {
-        File(context.cacheDir, "waveform_${file.nameWithoutExtension}_${file.lastModified()}_${requestedBarCount}.bin")
-    }
+    val requestedBarCount = WaveformCache.BAR_COUNT
 
-    val staticAmpsState = remember { mutableStateOf<FloatArray?>(null) }
+    // Instant if this recording's waveform was already prepared (opened before or warmed up).
+    val staticAmpsState = remember(filePath) { mutableStateOf(WaveformCache.peek(file)) }
     var isComputing by remember { mutableStateOf(false) }
 
+    // Playback is prepared as soon as the screen opens, so Play starts instantly.
+    var playWhenPrepared by remember { mutableStateOf(false) }
+    var preparing by remember { mutableStateOf(false) }
+    val pendingPlayer = remember { arrayOfNulls<MediaPlayer>(1) }
+
+    fun startPreparing() {
+        if (preparing || player.value != null) return
+        preparing = true
+        try {
+            val mp = MediaPlayer()
+            pendingPlayer[0] = mp
+            mp.setDataSource(context, Uri.fromFile(file))
+            mp.setOnPreparedListener { p ->
+                preparing = false
+                pendingPlayer[0] = null
+                duration = p.duration
+                player.value = p
+                if (currentPos > 0) {
+                    try { p.seekTo(currentPos) } catch (_: Exception) {}
+                }
+                if (playWhenPrepared) {
+                    playWhenPrepared = false
+                    p.start()
+                    isPlaying = true
+                }
+            }
+            mp.setOnCompletionListener {
+                isPlaying = false
+                currentPos = duration
+            }
+            mp.setOnErrorListener { _, what, extra ->
+                preparing = false
+                playWhenPrepared = false
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("Playback error: what=$what extra=$extra")
+                }
+                true
+            }
+            mp.prepareAsync()
+        } catch (e: Exception) {
+            preparing = false
+            playWhenPrepared = false
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("Failed to play: ${e.message}")
+            }
+        }
+    }
+
+    LaunchedEffect(filePath) { startPreparing() }
+
+    // Duration first (cheap), so the time labels appear right away.
     LaunchedEffect(filePath) {
+        try {
+            withContext(Dispatchers.IO) {
+                val retriever = MediaMetadataRetriever()
+                try {
+                    retriever.setDataSource(file.absolutePath)
+                    retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                        ?.toIntOrNull()
+                } finally {
+                    retriever.release()
+                }
+            }?.let { d -> if (duration == 0) duration = d }
+        } catch (_: Exception) {
+        }
+    }
+
+    LaunchedEffect(filePath) {
+        if (staticAmpsState.value != null) return@LaunchedEffect
         isComputing = true
         try {
-            val cached = withContext(Dispatchers.IO) {
-                readWaveformCache(waveformCacheFile, requestedBarCount)
-            }
-            if (cached != null) {
-                staticAmpsState.value = cached
-            } else {
-                val amps = withContext(Dispatchers.IO) {
-                    computePeaksFromAudioFile(file.absolutePath, requestedBarCount)
-                }
-                staticAmpsState.value = amps
-                withContext(Dispatchers.IO) {
-                    writeWaveformCache(waveformCacheFile, amps)
-                }
-            }
-
-            try {
-                withContext(Dispatchers.IO) {
-                    val retriever = MediaMetadataRetriever()
-                    retriever.setDataSource(file.absolutePath)
-                    val durStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                    retriever.release()
-                    durStr?.toIntOrNull()?.let { d -> duration = d }
-                }
-            } catch (_: Exception) {
-            }
+            staticAmpsState.value = WaveformCache.get(context, file)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             staticAmpsState.value = null
             coroutineScope.launch { snackbarHostState.showSnackbar("Waveform compute failed: ${e.message}") }
@@ -140,6 +185,8 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
             try { player.value?.stop() } catch (_: Exception) {}
             try { player.value?.release() } catch (_: Exception) {}
             player.value = null
+            try { pendingPlayer[0]?.release() } catch (_: Exception) {}
+            pendingPlayer[0] = null
         }
     }
 
@@ -241,7 +288,7 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
                     contentAlignment = Alignment.Center
                 ) {
                 WaveformBars(
-                    audioSessionId = if (staticAmpsState.value == null) player.value?.audioSessionId ?: 0 else 0,
+                    audioSessionId = if (staticAmpsState.value == null && !isComputing) player.value?.audioSessionId ?: 0 else 0,
                     progress = if (!isUserSeeking && duration > 0) currentPos / duration.toFloat() else uiProgress,
                     onSeek = { frac ->
                         val target = (frac * duration).toInt().coerceIn(0, duration)
@@ -375,37 +422,8 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
                             onCheckedChange = { checked ->
                                 val mp = player.value
                                 if (mp == null) {
-                                    coroutineScope.launch {
-                                        try {
-                                            val newMp = MediaPlayer().apply {
-                                                setDataSource(context, android.net.Uri.fromFile(file))
-                                                setOnPreparedListener { p ->
-                                                    duration = p.duration
-                                                    player.value = p
-                                                    if (currentPos > 0) {
-                                                        try { p.seekTo(currentPos) } catch (_: Exception) {}
-                                                    }
-                                                    p.start()
-                                                    isPlaying = true
-                                                }
-                                                setOnCompletionListener {
-                                                    isPlaying = false
-                                                    currentPos = duration
-                                                }
-                                                setOnErrorListener { _, what, extra ->
-                                                    coroutineScope.launch {
-                                                        snackbarHostState.showSnackbar("Playback error: what=$what extra=$extra")
-                                                    }
-                                                    true
-                                                }
-                                            }
-                                            newMp.prepareAsync()
-                                        } catch (e: Exception) {
-                                            coroutineScope.launch {
-                                                snackbarHostState.showSnackbar("Failed to play: ${e.message}")
-                                            }
-                                        }
-                                    }
+                                    playWhenPrepared = true
+                                    startPreparing()
                                 } else {
                                     if (mp.isPlaying) {
                                         mp.pause()
@@ -473,31 +491,6 @@ private fun formatMs(ms: Int): String {
     val minutes = TimeUnit.MILLISECONDS.toMinutes(ms.toLong())
     val seconds = TimeUnit.MILLISECONDS.toSeconds(ms.toLong()) - TimeUnit.MINUTES.toSeconds(minutes)
     return String.format("%02d:%02d", minutes, seconds)
-}
-
-private fun readWaveformCache(cacheFile: File, expectedSize: Int): FloatArray? {
-    return try {
-        if (!cacheFile.exists()) return null
-        DataInputStream(FileInputStream(cacheFile)).use { input ->
-            val size = input.readInt()
-            if (size != expectedSize) return null
-            val data = FloatArray(size)
-            for (i in 0 until size) data[i] = input.readFloat()
-            data
-        }
-    } catch (_: Exception) {
-        null
-    }
-}
-
-private fun writeWaveformCache(cacheFile: File, amps: FloatArray) {
-    try {
-        DataOutputStream(FileOutputStream(cacheFile)).use { output ->
-            output.writeInt(amps.size)
-            for (i in amps.indices) output.writeFloat(amps[i])
-        }
-    } catch (_: Exception) {
-    }
 }
 
 /**
@@ -700,6 +693,8 @@ private fun WaveformBars(
                     targetAmps[i] = if (c > 0) (sum / c) else 0f
                 }
             }
+            // Show the shape immediately instead of growing it up from zero.
+            for (i in 0 until barCount) displayAmps[i] = targetAmps[i]
         }
     }
 

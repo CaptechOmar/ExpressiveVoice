@@ -67,6 +67,7 @@ import com.pranshulgg.recordmaster.ui.components.Symbol
 import com.pranshulgg.recordmaster.ui.components.TopBarWithSearch
 import com.pranshulgg.recordmaster.helpers.StorageHelper
 import com.pranshulgg.recordmaster.utils.RecordingGroup
+import com.pranshulgg.recordmaster.utils.WaveformCache
 import com.pranshulgg.recordmaster.utils.groupByMonth
 import com.pranshulgg.recordmaster.utils.listRecordingFiles
 import com.pranshulgg.recordmaster.utils.moveFileToDir
@@ -362,6 +363,12 @@ fun HomeScreen(navController: NavController, snackbarHostState: SnackbarHostStat
                     }
                 }
                 val groups = groupsState.value
+
+                // Quietly prepare the newest recordings' waveforms so they open instantly.
+                LaunchedEffect(groups) {
+                    val newest = groups?.flatMap { it.files }?.take(6)
+                    if (!newest.isNullOrEmpty()) WaveformCache.warmUp(context, newest)
+                }
 
                 if (groups == null) {
                     // first load still in progress

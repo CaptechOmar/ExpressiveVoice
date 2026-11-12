@@ -1,5 +1,6 @@
 package com.pranshulgg.recordmaster.ui.components.tiles
 
+import com.pranshulgg.recordmaster.ui.components.SettingsStyle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -40,7 +41,7 @@ fun CategoryTile(
             ),
             leadingContent = { IconContainer(color, icon = leading, iconColor = iconColor) },
             colors = ListItemDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+                containerColor = SettingsStyle.containerColor
             ),
             headlineContent = { Text(headline) },
             supportingContent = {

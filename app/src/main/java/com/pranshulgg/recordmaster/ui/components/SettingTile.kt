@@ -118,8 +118,8 @@ fun SettingSection(
 ) {
     Column(
         modifier = Modifier
-            .padding(horizontal = if (noPadding) 0.dp else 12.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+            .padding(horizontal = if (noPadding) 0.dp else SettingsStyle.SideMargin),
+        verticalArrangement = Arrangement.spacedBy(SettingsStyle.ItemGap)
     ) {
         title?.let {
             Text(
@@ -140,24 +140,26 @@ fun SettingSection(
             val primarySwitch = primarySwitch
 
 
+            val outer = SettingsStyle.OuterCorner
+            val inner = SettingsStyle.InnerCorner
             val shape = when {
                 primarySwitch -> RoundedCornerShape(50.dp)
-                isOnly -> RoundedCornerShape(18.dp)
+                isOnly -> RoundedCornerShape(outer)
                 isFirst -> RoundedCornerShape(
-                    topStart = 18.dp,
-                    topEnd = 18.dp,
-                    bottomStart = 2.6.dp,
-                    bottomEnd = 2.6.dp
+                    topStart = outer,
+                    topEnd = outer,
+                    bottomStart = inner,
+                    bottomEnd = inner
                 )
 
                 isLast -> RoundedCornerShape(
-                    topStart = 2.6.dp,
-                    topEnd = 2.6.dp,
-                    bottomStart = 18.dp,
-                    bottomEnd = 18.dp
+                    topStart = inner,
+                    topEnd = inner,
+                    bottomStart = outer,
+                    bottomEnd = outer
                 )
 
-                else -> RoundedCornerShape(2.6.dp)
+                else -> RoundedCornerShape(inner)
             }
 
             when (tile) {

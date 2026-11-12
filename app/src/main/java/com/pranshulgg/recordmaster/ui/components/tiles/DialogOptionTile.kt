@@ -1,5 +1,6 @@
 package com.pranshulgg.recordmaster.ui.components.tiles
 
+import com.pranshulgg.recordmaster.ui.components.SettingsStyle
 import android.app.AlertDialog
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
@@ -70,7 +71,7 @@ fun <T> DialogOptionTile(
             modifier = Modifier
                 .clickable { showDialog = true },
             colors = ListItemDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+                containerColor = SettingsStyle.containerColor
             ),
             leadingContent = leading,
             headlineContent = { Text(headline) },

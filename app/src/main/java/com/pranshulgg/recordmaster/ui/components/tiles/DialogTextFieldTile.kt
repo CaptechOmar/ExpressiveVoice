@@ -1,5 +1,6 @@
 package com.pranshulgg.recordmaster.ui.components.tiles
 
+import com.pranshulgg.recordmaster.ui.components.SettingsStyle
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,7 +33,7 @@ fun DialogTextFieldTile(
         ListItem(
             modifier = Modifier.clickable { showDialog = true },
             colors = ListItemDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+                containerColor = SettingsStyle.containerColor
             ),
             leadingContent = leading,
             headlineContent = { Text(headline) },

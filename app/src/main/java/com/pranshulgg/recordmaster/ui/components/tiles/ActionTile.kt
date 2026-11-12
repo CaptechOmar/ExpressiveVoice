@@ -1,5 +1,6 @@
 package com.pranshulgg.recordmaster.ui.components.tiles
 
+import com.pranshulgg.recordmaster.ui.components.SettingsStyle
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,7 +33,7 @@ fun ActionTile(
             ),
             leadingContent = leading,
             colors = ListItemDefaults.colors(
-                containerColor = if(danger) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainerLowest
+                containerColor = if(danger) MaterialTheme.colorScheme.errorContainer else SettingsStyle.containerColor
             ),
             headlineContent = { Text(headline, color = if(danger) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface) },
             supportingContent = {

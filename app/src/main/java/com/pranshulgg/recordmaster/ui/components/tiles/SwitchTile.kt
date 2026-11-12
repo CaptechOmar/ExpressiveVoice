@@ -1,5 +1,6 @@
 package com.pranshulgg.recordmaster.ui.components.tiles
 
+import com.pranshulgg.recordmaster.ui.components.SettingsStyle
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -40,7 +41,7 @@ fun SwitchTile(
             },
 
             colors = ListItemDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+                containerColor = SettingsStyle.containerColor
             ),
             leadingContent = leading,
             headlineContent = { Text(headline) },

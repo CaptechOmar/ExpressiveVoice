@@ -47,7 +47,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.pranshulgg.recordmaster.helpers.RecordQuality
 import com.pranshulgg.recordmaster.helpers.SnackbarManager
+import com.pranshulgg.recordmaster.utils.WaveformCache
 import com.pranshulgg.recordmaster.helpers.StorageHelper
 import com.pranshulgg.recordmaster.ui.components.HapticOnPress
 import com.pranshulgg.recordmaster.ui.components.Symbol
@@ -381,6 +383,7 @@ fun RecordingScreen(onDone: () -> Unit, autoStart: Boolean = false) {
                                         isPaused = false
                                         amplitudes.clear()
                                         elapsedSeconds = 0L
+                                        if (path != null) WaveformCache.warmUp(context, listOf(File(path)))
                                         // Show the result on the home screen (this screen is about to close)
                                         SnackbarManager.showMessage(
                                             if (path != null) "Saved: ${File(path).name}" else "Save failed"
@@ -500,15 +503,34 @@ private fun startRecording(
         mainTitle = fileName.removeSuffix(".m4a")
 
 
-        val recorder = MediaRecorder().apply {
-            setAudioSource(MediaRecorder.AudioSource.MIC)
-            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            setAudioSamplingRate(44100)
-            setAudioEncodingBitRate(128000)
-            setOutputFile(file.absolutePath)
-            prepare()
-            start()
+        fun buildRecorder(quality: RecordQuality): MediaRecorder {
+            val r = MediaRecorder()
+            try {
+                r.apply {
+                    setAudioSource(MediaRecorder.AudioSource.MIC)
+                    setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                    setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                    setAudioSamplingRate(quality.sampleRate)
+                    setAudioEncodingBitRate(quality.bitRate)
+                    setOutputFile(file.absolutePath)
+                    prepare()
+                    start()
+                }
+                return r
+            } catch (e: Exception) {
+                try { r.release() } catch (_: Exception) {}
+                throw e
+            }
+        }
+
+        val chosen = RecordQuality.current()
+        val recorder = try {
+            buildRecorder(chosen)
+        } catch (e: Exception) {
+            // Some phones reject certain sample rates / bit rates: fall back to the safe default.
+            if (chosen == RecordQuality.STANDARD) throw e
+            Log.w("RecordingScreen", "quality ${chosen.key} not supported, using standard", e)
+            buildRecorder(RecordQuality.STANDARD)
         }
 
         try {

@@ -13,6 +13,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
+import com.pranshulgg.recordmaster.helpers.RecordQuality
 import com.pranshulgg.recordmaster.helpers.StorageHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -148,6 +149,7 @@ fun SettingsPage(
 
     // -------------------- Recordings folder --------------------
 
+    var recordQuality by remember { mutableStateOf(RecordQuality.current()) }
     var customPath by remember { mutableStateOf(StorageHelper.customRecordingsPath()) }
     var accessTick by remember { mutableStateOf(0) }
     val effectiveDir = remember(customPath, accessTick) { StorageHelper.getRecordingsDir(context) }
@@ -399,10 +401,22 @@ fun SettingsPage(
                 )
             }
             item {
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(16.dp))
                 SettingSection(
-                    title = "Storage",
+                    title = "Recording",
                     tiles = listOfNotNull(
+                        SettingTile.DialogOptionTile(
+                            leading = { SettingsTileIcon(R.drawable.graphic_eq_24px) },
+                            title = "Recording quality",
+                            dialogTitle = "Recording quality",
+                            options = RecordQuality.entries.map { it.key },
+                            selectedOption = recordQuality.key,
+                            optionLabel = { RecordQuality.fromKey(it).label },
+                            onOptionSelected = { key ->
+                                PreferencesHelper.setString(RecordQuality.PREF_KEY, key)
+                                recordQuality = RecordQuality.fromKey(key)
+                            }
+                        ),
                         SettingTile.ActionTile(
                             leading = { SettingsTileIcon(R.drawable.folder_24px) },
                             title = "Recordings folder",
@@ -421,7 +435,7 @@ fun SettingsPage(
                 )
             }
             item {
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(16.dp))
                 SettingSection(
                     title = "Additional",
                     tiles = listOf(
