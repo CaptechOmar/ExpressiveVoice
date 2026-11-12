@@ -361,7 +361,10 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
             }
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(formatMs(currentPos), color = MaterialTheme.colorScheme.onSurface)
+                Text(
+                    formatMs(if (isUserSeeking) (uiProgress * duration).toInt() else currentPos),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
                 Text(formatMs(duration), color = MaterialTheme.colorScheme.onSurface)
             }
             }
@@ -700,6 +703,8 @@ private fun WaveformBars(
 
     val waveformHistory = remember { ArrayDeque<FloatArray>() }
     LaunchedEffect(waveformRaw.value) {
+        // A finished waveform is already on screen - don't overwrite it with the flat placeholder.
+        if (staticAmps != null) return@LaunchedEffect
         val raw = waveformRaw.value
         if (raw == null || raw.isEmpty()) {
             for (i in 0 until barCount) targetAmps[i] = (0.02f + (i % 7) * 0.0045f)

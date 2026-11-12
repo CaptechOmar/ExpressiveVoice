@@ -38,7 +38,7 @@ import com.pranshulgg.recordmaster.helpers.Haptics
 
 // Same size as the Record pill on the recorder screen: 96dp tall, and 60% of the screen width
 // minus that screen's 14dp side padding, so the two buttons match on every phone.
-private val ButtonHeight = 96.dp
+private val ButtonHeight = 86.dp
 private val RestingCorner = ButtonHeight / 2 // full pill
 private val PressedCorner = 14.dp            // squared-off while held
 
@@ -51,7 +51,7 @@ private val PressedCorner = 14.dp            // squared-off while held
 fun RecordButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val interactionSource = remember { MutableInteractionSource() }
-    val buttonWidth = (LocalConfiguration.current.screenWidthDp - 28).dp * 0.6f
+    val buttonWidth = (LocalConfiguration.current.screenWidthDp - 28).dp * 0.54f
     val pressed by interactionSource.collectIsPressedAsState()
 
     // Haptics fire on touch-down / touch-up, not on "click", so they feel like a real key.
@@ -95,7 +95,7 @@ fun RecordButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
         ) {
             Symbol(
                 R.drawable.fiber_manual_record_24px,
-                size = 29.4.dp, // 5% bigger than the 28dp icon on the recorder screen
+                size = 26.5.dp, // 5% bigger than the 28dp icon on the recorder screen
                 color = MaterialTheme.colorScheme.onErrorContainer
             )
             Spacer(Modifier.width(5.dp))
@@ -103,7 +103,7 @@ fun RecordButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
                 text = "Record",
                 color = MaterialTheme.colorScheme.onErrorContainer,
                 fontWeight = FontWeight.Bold,
-                fontSize = 21.sp // 5% bigger than the 20sp label on the recorder screen
+                fontSize = 19.sp // 5% bigger than the 20sp label on the recorder screen
             )
         }
     }
