@@ -36,19 +36,15 @@
 # 👁️ Screenshots
 
 <div align="center">
-  <img src="prev/prev_1.png" width="250">
-  <img src="prev/prev_2.png" width="250">
-  <img src="prev/prev_3.png" width="250">
+  <img src="prev/home.jpg" width="250">
+  <img src="prev/recording.jpg" width="250">
+  <img src="prev/player.jpg" width="250">
+   <img src="prev/playerpaused.jpg" width="250">
+   <img src="prev/settings.jpg" width="250">
+   <img src="prev/live.jpg" width="250">
+   <img src="prev/livesmall.jpg" width="250">
 </div>
 
-## New Changes
-
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/31981b4f-8194-4348-90d1-71f25be62c1c" width="250"/>
-  <img src="https://github.com/user-attachments/assets/2fadc12d-e303-4072-b327-ac69923087a2" width="250"/>
-</p>
-
-</div>
 
 <br>
 
