@@ -54,7 +54,11 @@
 
 <br>
 
-# 📝 What's new in 2.5
+# 📝 What's new in 2.6
+
+- Long-press the app icon to start recording right away; also available to Shortcut Maker, KWGT and Tasker.
+
+## 2.5
 
 - Live recording notification with Pause/Resume and Stop, and recording that continues in the background.
 - Update checker fixed.
