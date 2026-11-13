@@ -123,6 +123,7 @@ class RecordingService : Service() {
         val open = PendingIntent.getActivity(
             this, 0,
             Intent(this, MainActivity::class.java)
+                .putExtra(MainActivity.EXTRA_OPEN_RECORDING, true)
                 .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )

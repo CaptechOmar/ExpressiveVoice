@@ -1,5 +1,6 @@
 package com.pranshulgg.recordmaster
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -69,11 +70,32 @@ import com.pranshulgg.recordmaster.ui.theme.RecordMasterTheme
 import com.pranshulgg.recordmaster.utils.NavTransitions
 
 class MainActivity : ComponentActivity() {
+    /** Bumped whenever something asks us to show the recording screen (shortcut, notification). */
+    private var openRecordingRequests by mutableStateOf(0)
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_OPEN_RECORDING, false) == true) {
+            intent.removeExtra(EXTRA_OPEN_RECORDING)
+            openRecordingRequests++
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    companion object {
+        const val EXTRA_OPEN_RECORDING = "open_recording"
+    }
+
     @OptIn(ExperimentalMaterial3ExpressiveApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         PreferencesHelper.init(this)
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        handleIntent(intent)
         setContent {
             val snackbarHostState = remember { SnackbarHostState() }
             val scope = rememberCoroutineScope()
@@ -108,6 +130,15 @@ class MainActivity : ComponentActivity() {
             }
 
             val context = LocalContext.current;
+
+            // Quick-record shortcut / notification tap: show the live recording screen.
+            LaunchedEffect(openRecordingRequests) {
+                if (openRecordingRequests > 0 &&
+                    navController.currentDestination?.route?.startsWith("record") != true
+                ) {
+                    navController.navigate("record?autostart=false") { launchSingleTop = true }
+                }
+            }
 
             RecordMasterTheme(
                 darkTheme = darkTheme,

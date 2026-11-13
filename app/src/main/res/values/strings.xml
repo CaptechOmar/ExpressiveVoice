@@ -2,4 +2,8 @@
     <string name="app_name">Expressive Voice</string>
     <!-- Name under the launcher icon -->
     <string name="launcher_label">Recorder</string>
+    <!-- Long-press shortcut / entry shown in Shortcut Maker, KWGT, Tasker -->
+    <string name="shortcut_record_short">Record</string>
+    <string name="shortcut_record_long">Start recording</string>
+    <string name="quick_record_label">Start recording</string>
 </resources>

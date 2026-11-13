@@ -42,6 +42,28 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Long-press app icon shortcut: "Record" -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity>
+
+        <!--
+            Starts a recording right away. Exported with its own label and icon so launcher
+            shortcuts, Shortcut Maker, KWGT and Tasker can all find and launch it.
+        -->
+        <activity
+            android:name=".QuickRecordActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:icon="@drawable/ic_shortcut_record"
+            android:label="@string/quick_record_label"
+            android:taskAffinity=""
+            android:theme="@style/Theme.RecordMaster.Transparent">
+            <intent-filter>
+                <action android:name="com.captechomar.recorder.action.QUICK_RECORD" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
         <service
