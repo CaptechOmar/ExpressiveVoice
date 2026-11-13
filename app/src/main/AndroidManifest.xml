@@ -64,6 +64,11 @@
                 <action android:name="com.captechomar.recorder.action.QUICK_RECORD" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <!-- Lets apps like KWGT list it in their "Shortcut" picker -->
+            <intent-filter>
+                <action android:name="android.intent.action.CREATE_SHORTCUT" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
         <service

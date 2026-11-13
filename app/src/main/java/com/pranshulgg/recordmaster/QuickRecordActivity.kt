@@ -38,6 +38,25 @@ class QuickRecordActivity : ComponentActivity() {
         PreferencesHelper.init(this)
         super.onCreate(savedInstanceState)
 
+        // A shortcut picker (KWGT, launchers) is asking us what shortcut to create: describe it
+        // and return, without recording anything.
+        if (intent?.action == Intent.ACTION_CREATE_SHORTCUT) {
+            val target = Intent(this, QuickRecordActivity::class.java)
+                .setAction(Intent.ACTION_VIEW)
+            setResult(
+                RESULT_OK,
+                Intent()
+                    .putExtra(Intent.EXTRA_SHORTCUT_INTENT, target)
+                    .putExtra(Intent.EXTRA_SHORTCUT_NAME, getString(R.string.quick_record_label))
+                    .putExtra(
+                        Intent.EXTRA_SHORTCUT_ICON_RESOURCE,
+                        Intent.ShortcutIconResource.fromContext(this, R.drawable.ic_shortcut_record)
+                    )
+            )
+            finish()
+            return
+        }
+
         val needed = mutableListOf<String>()
         if (!micGranted()) needed += Manifest.permission.RECORD_AUDIO
         // Same one-time notification prompt as the Record screen.
