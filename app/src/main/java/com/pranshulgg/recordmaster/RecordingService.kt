@@ -175,7 +175,7 @@ class RecordingService : Service() {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
-            .setCategory(NotificationCompat.CATEGORY_VOICEMAIL)
+            .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setColor(ContextCompat.getColor(this, android.R.color.holo_red_dark))
