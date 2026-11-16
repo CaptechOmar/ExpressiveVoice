@@ -129,7 +129,7 @@ class RecordingService : Service() {
         )
 
         val b = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.fiber_manual_record_24px)
+            .setSmallIcon(R.drawable.ic_mic)
             .setContentTitle(if (paused) "Recording paused" else "Recording")
             .setContentText(name ?: "")
             .setContentIntent(open)

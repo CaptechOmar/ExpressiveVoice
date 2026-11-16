@@ -1,6 +1,14 @@
 package com.pranshulgg.recordmaster.screens
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import com.pranshulgg.recordmaster.helpers.PlaybackController
+import com.pranshulgg.recordmaster.helpers.PreferencesHelper
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
@@ -71,8 +79,10 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
     val context = LocalContext.current
     val file = remember { File(filePath) }
 
-    val player = remember { mutableStateOf<MediaPlayer?>(null) }
-    var isPlaying by remember { mutableStateOf(false) }
+    // Playback lives in PlaybackController (shared with the media notification), so it keeps
+    // going, and stays controllable, when you switch to another app.
+    val player = PlaybackController.player.collectAsState()
+    val isPlaying by PlaybackController.isPlaying.collectAsState()
     var currentPos by remember { mutableStateOf(0) }
     var duration by remember { mutableStateOf(0) }
     val sdfDate = SimpleDateFormat("MMM dd", Locale.getDefault())
@@ -92,54 +102,37 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
     var isComputing by remember { mutableStateOf(false) }
 
     // Playback is prepared as soon as the screen opens, so Play starts instantly.
-    var playWhenPrepared by remember { mutableStateOf(false) }
-    var preparing by remember { mutableStateOf(false) }
-    val pendingPlayer = remember { arrayOfNulls<MediaPlayer>(1) }
-
-    fun startPreparing() {
-        if (preparing || player.value != null) return
-        preparing = true
-        try {
-            val mp = MediaPlayer()
-            pendingPlayer[0] = mp
-            mp.setDataSource(context, Uri.fromFile(file))
-            mp.setOnPreparedListener { p ->
-                preparing = false
-                pendingPlayer[0] = null
-                duration = p.duration
-                player.value = p
-                if (currentPos > 0) {
-                    try { p.seekTo(currentPos) } catch (_: Exception) {}
-                }
-                if (playWhenPrepared) {
-                    playWhenPrepared = false
-                    p.start()
-                    isPlaying = true
-                }
-            }
-            mp.setOnCompletionListener {
-                isPlaying = false
-                currentPos = duration
-            }
-            mp.setOnErrorListener { _, what, extra ->
-                preparing = false
-                playWhenPrepared = false
-                coroutineScope.launch {
-                    snackbarHostState.showSnackbar("Playback error: what=$what extra=$extra")
-                }
-                true
-            }
-            mp.prepareAsync()
-        } catch (e: Exception) {
-            preparing = false
-            playWhenPrepared = false
-            coroutineScope.launch {
-                snackbarHostState.showSnackbar("Failed to play: ${e.message}")
-            }
-        }
+    LaunchedEffect(filePath) {
+        PlaybackController.load(context, filePath)
+        currentPos = PlaybackController.position()
+        duration = PlaybackController.duration.value
     }
 
-    LaunchedEffect(filePath) { startPreparing() }
+    val controllerDuration by PlaybackController.duration.collectAsState()
+    LaunchedEffect(controllerDuration) { if (controllerDuration > 0) duration = controllerDuration }
+
+    LaunchedEffect(Unit) {
+        PlaybackController.completions.collect { currentPos = duration }
+    }
+    LaunchedEffect(Unit) {
+        PlaybackController.errors.collect { snackbarHostState.showSnackbar(it) }
+    }
+
+    // First time playing, ask once to show the playback notification (playback works without it).
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
+    fun togglePlayback() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED &&
+            PreferencesHelper.getBool("asked_notification_permission") != true
+        ) {
+            PreferencesHelper.setBool("asked_notification_permission", true)
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        PlaybackController.toggle()
+    }
 
     // Duration first (cheap), so the time labels appear right away.
     LaunchedEffect(filePath) {
@@ -173,20 +166,26 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
         }
     }
 
-    LaunchedEffect(isPlaying, player.value) {
+    // Also re-syncs when the notification seeks or pauses while this screen is open.
+    val playbackVersion by PlaybackController.version.collectAsState()
+    LaunchedEffect(isPlaying, player.value, playbackVersion) {
+        currentPos = PlaybackController.position()
         while (isPlaying && player.value != null) {
-            currentPos = player.value?.currentPosition ?: 0
+            currentPos = PlaybackController.position()
             delay(50)
         }
     }
 
+    // Leaving the screen stops playback; a rotation or the system recreating the activity doesn't.
     DisposableEffect(Unit) {
         onDispose {
-            try { player.value?.stop() } catch (_: Exception) {}
-            try { player.value?.release() } catch (_: Exception) {}
-            player.value = null
-            try { pendingPlayer[0]?.release() } catch (_: Exception) {}
-            pendingPlayer[0] = null
+            val activity = context as? android.app.Activity
+            if (activity?.isChangingConfigurations != true &&
+                activity?.isFinishing != true &&
+                activity?.isDestroyed != true
+            ) {
+                PlaybackController.stop()
+            }
         }
     }
 
@@ -209,15 +208,7 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
                     onDelete = {
                         coroutineScope.launch {
                             try {
-                                try {
-                                    player.value?.stop()
-                                } catch (_: Exception) {
-                                }
-                                try {
-                                    player.value?.release()
-                                } catch (_: Exception) {
-                                }
-                                player.value = null
+                                PlaybackController.stop()
 
                                 val ok = file.delete()
                                 if (ok) {
@@ -270,7 +261,7 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
             var isUserSeeking by remember { mutableStateOf(false) }
             fun seekToMs(targetMs: Int) {
                 val clamped = targetMs.coerceIn(0, duration)
-                try { player.value?.seekTo(clamped) } catch (_: Exception) {}
+                PlaybackController.seekTo(clamped)
                 currentPos = clamped
                 if (duration > 0) uiProgress = (clamped / duration.toFloat()).coerceIn(0f, 1f)
             }
@@ -292,7 +283,7 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
                     progress = if (!isUserSeeking && duration > 0) currentPos / duration.toFloat() else uiProgress,
                     onSeek = { frac ->
                         val target = (frac * duration).toInt().coerceIn(0, duration)
-                        try { player.value?.seekTo(target) } catch (_: Exception) {}
+                        PlaybackController.seekTo(target)
                         currentPos = target
                         uiProgress = frac.coerceIn(0f, 1f)
                     },
@@ -353,7 +344,7 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
                     onValueChangeFinished = {
                         isUserSeeking = false
                         val target = (uiProgress * duration).toInt().coerceIn(0, duration)
-                        try { player.value?.seekTo(target) } catch (_: Exception) {}
+                        PlaybackController.seekTo(target)
                         currentPos = target
                     },
                     modifier = Modifier.fillMaxWidth().height(26.dp)
@@ -423,20 +414,7 @@ fun PlayRecordingScreen(filePath: String, onDone: () -> Unit, navController: Nav
                             shapes = ToggleButtonDefaults.shapes(),
                             checked = isPlaying,
                             onCheckedChange = { checked ->
-                                val mp = player.value
-                                if (mp == null) {
-                                    playWhenPrepared = true
-                                    startPreparing()
-                                } else {
-                                    if (mp.isPlaying) {
-                                        mp.pause()
-                                        isPlaying = false
-                                    } else {
-                                        mp.start()
-                                        isPlaying = true
-                                    }
-                                }
-
+                                togglePlayback()
                             }
 
                         ) {
