@@ -167,7 +167,7 @@ class RecordingService : Service() {
         )
 
         val b = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(if (dotOn) R.drawable.fiber_manual_record_24px else R.drawable.ic_rec_dim)
+            .setSmallIcon(if (dotOn) R.drawable.fiber_manual_record_24px else R.drawable.ic_rec_off)
             .setLargeIcon(micBadge)
             .setContentTitle(if (paused) "Recording paused" else "Recording")
             .setContentText(name ?: "")
@@ -175,7 +175,7 @@ class RecordingService : Service() {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setCategory(NotificationCompat.CATEGORY_VOICEMAIL)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setColor(ContextCompat.getColor(this, android.R.color.holo_red_dark))

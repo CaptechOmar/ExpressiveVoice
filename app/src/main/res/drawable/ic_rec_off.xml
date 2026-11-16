@@ -3,7 +3,9 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+    <!-- Fully transparent: the "off" half of the blinking recording dot -->
     <path
         android:fillColor="@android:color/white"
+        android:fillAlpha="0"
         android:pathData="M12,12m-3.5,0a3.5,3.5 0,1 1,7 0a3.5,3.5 0,1 1,-7 0" />
 </vector>
