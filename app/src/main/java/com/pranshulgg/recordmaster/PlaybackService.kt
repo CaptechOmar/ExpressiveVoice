@@ -49,6 +49,15 @@ class PlaybackService : Service() {
                 override fun onRewind() = PlaybackController.seekBy(-REWIND_MS)
                 override fun onFastForward() = PlaybackController.seekBy(FORWARD_MS)
                 override fun onStop() = PlaybackController.stop()
+                // Android 13+ builds the media controls from the session, not from the notification
+                // buttons, so -5 s / +10 s / stop have to be offered as custom actions here.
+                override fun onCustomAction(action: String, extras: android.os.Bundle?) {
+                    when (action) {
+                        CUSTOM_REWIND -> PlaybackController.seekBy(-REWIND_MS)
+                        CUSTOM_FORWARD -> PlaybackController.seekBy(FORWARD_MS)
+                        CUSTOM_STOP -> PlaybackController.stop()
+                    }
+                }
             })
             isActive = true
         }
@@ -104,6 +113,15 @@ class PlaybackService : Service() {
                         PlaybackState.ACTION_PLAY_PAUSE or PlaybackState.ACTION_SEEK_TO or
                         PlaybackState.ACTION_REWIND or PlaybackState.ACTION_FAST_FORWARD or
                         PlaybackState.ACTION_STOP
+                )
+                .addCustomAction(
+                    PlaybackState.CustomAction.Builder(CUSTOM_REWIND, "Back 5 seconds", R.drawable.replay_5_24px).build()
+                )
+                .addCustomAction(
+                    PlaybackState.CustomAction.Builder(CUSTOM_FORWARD, "Forward 10 seconds", R.drawable.forward_10_24px).build()
+                )
+                .addCustomAction(
+                    PlaybackState.CustomAction.Builder(CUSTOM_STOP, "Stop", R.drawable.close_24px).build()
                 )
                 .setState(
                     if (playing) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED,
@@ -206,6 +224,9 @@ class PlaybackService : Service() {
         private const val NOTIFICATION_ID = 4102
         private const val REWIND_MS = 5_000
         private const val FORWARD_MS = 10_000
+        private const val CUSTOM_REWIND = "rewind5"
+        private const val CUSTOM_FORWARD = "forward10"
+        private const val CUSTOM_STOP = "stop"
         const val ACTION_SYNC = "com.captechomar.recorder.action.PLAYBACK_SYNC"
         const val ACTION_TOGGLE = "com.captechomar.recorder.action.PLAYBACK_TOGGLE"
         const val ACTION_REWIND = "com.captechomar.recorder.action.PLAYBACK_REWIND"
