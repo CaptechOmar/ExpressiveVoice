@@ -8,6 +8,9 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -22,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -32,6 +36,7 @@ class RecordingService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var statusJob: Job? = null
+    private var blinkJob: Job? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -68,9 +73,41 @@ class RecordingService : Service() {
         statusJob?.cancel()
         statusJob = scope.launch {
             RecorderController.status.collect { status ->
-                if (status == Status.IDLE) stopForegroundAndSelf() else notify(buildNotification(status))
+                blinkJob?.cancel()
+                when (status) {
+                    Status.IDLE -> stopForegroundAndSelf()
+                    Status.PAUSED -> notify(buildNotification(status))
+                    Status.RECORDING -> {
+                        // The status-bar dot can't animate itself, so swap it once a second.
+                        blinkJob = scope.launch {
+                            var on = true
+                            while (true) {
+                                notify(buildNotification(status, dotOn = on))
+                                on = !on
+                                delay(1000)
+                            }
+                        }
+                    }
+                }
             }
         }
+    }
+
+    /** A white mic on a red disc: the large icon some live-activity / island apps display. */
+    private val micBadge: Bitmap by lazy {
+        val size = 192
+        val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        canvas.drawCircle(
+            size / 2f, size / 2f, size / 2f,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFB3261E.toInt() }
+        )
+        ContextCompat.getDrawable(this, R.drawable.ic_mic)?.let { d ->
+            val pad = size / 4
+            d.setBounds(pad, pad, size - pad, size - pad)
+            d.draw(canvas)
+        }
+        bmp
     }
 
     private fun refreshOrStop() {
@@ -87,6 +124,7 @@ class RecordingService : Service() {
     }
 
     private fun stopForegroundAndSelf() {
+        blinkJob?.cancel()
         statusJob?.cancel()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -115,7 +153,7 @@ class RecordingService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-    private fun buildNotification(status: Status): Notification {
+    private fun buildNotification(status: Status, dotOn: Boolean = true): Notification {
         val paused = status == Status.PAUSED
         val name = RecorderController.fileName.value?.removeSuffix(".m4a")
         val elapsed = RecorderController.elapsedMs()
@@ -129,7 +167,8 @@ class RecordingService : Service() {
         )
 
         val b = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_mic)
+            .setSmallIcon(if (dotOn) R.drawable.fiber_manual_record_24px else R.drawable.ic_rec_dim)
+            .setLargeIcon(micBadge)
             .setContentTitle(if (paused) "Recording paused" else "Recording")
             .setContentText(name ?: "")
             .setContentIntent(open)
